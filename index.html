@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Turnierübersicht</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    h1, h2 { text-align: center; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: center; }
+    tr.highlight { background-color: #fffdc1; }
+    .team-buttons { text-align: center; margin-bottom: 2rem; }
+    .team-buttons button { margin: 0.25rem; padding: 0.5rem 1rem; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Turnier & Liga Übersicht</h1>
+
+  <div class="team-buttons" id="teamButtons"></div>
+
+  <h2>Gruppe A</h2>
+  <table id="groupA">
+    <thead>
+      <tr><th>Team</th><th>Spiele</th><th>Siege</th><th>Niederlagen</th></tr>
+    </thead>
+    <tbody id="groupABody"></tbody>
+  </table>
+
+  <h2>Gruppe B</h2>
+  <table id="groupB">
+    <thead>
+      <tr><th>Team</th><th>Spiele</th><th>Siege</th><th>Niederlagen</th></tr>
+    </thead>
+    <tbody id="groupBBody"></tbody>
+  </table>
+
+  <h2>Spiele</h2>
+  <table id="matchTable">
+    <thead>
+      <tr><th>Datum</th><th>Team A</th><th>Team B</th><th>Ergebnis</th></tr>
+    </thead>
+    <tbody id="matchBody"></tbody>
+  </table>
+
+  <script>
+    const teamsA = ["Team A1", "Team A2", "Team A3", "Team A4", "Team A5", "Team A6", "Team A7", "Team A8"];
+    const teamsB = ["Team B1", "Team B2", "Team B3", "Team B4", "Team B5", "Team B6", "Team B7", "Team B8"];
+    const allTeams = [...teamsA, ...teamsB];
+
+    // Platzhalter-Ergebnisse
+    const matches = [
+      { date: "01.04.", teamA: "Team A1", teamB: "Team A2", result: "2:1" },
+      { date: "02.04.", teamA: "Team A3", teamB: "Team A4", result: "0:3" },
+      { date: "03.04.", teamA: "Team B1", teamB: "Team B2", result: "1:1" },
+      { date: "04.04.", teamA: "Team A1", teamB: "Team A3", result: "-" },
+      { date: "05.04.", teamA: "Team B3", teamB: "Team B4", result: "-" },
+    ];
+
+    function createTeamTable(teams, tbodyId) {
+      const tbody = document.getElementById(tbodyId);
+      tbody.innerHTML = "";
+      teams.forEach(team => {
+        const row = document.createElement("tr");
+        row.setAttribute("data-team", team);
+        row.innerHTML = `<td>${team}</td><td>0</td><td>0</td><td>0</td>`;
+        tbody.appendChild(row);
+      });
+    }
+
+    function populateMatches() {
+      const tbody = document.getElementById("matchBody");
+      tbody.innerHTML = "";
+      matches.forEach(m => {
+        const row = document.createElement("tr");
+        row.setAttribute("data-teams", `${m.teamA},${m.teamB}`);
+        row.innerHTML = `<td>${m.date}</td><td>${m.teamA}</td><td>${m.teamB}</td><td>${m.result}</td>`;
+        tbody.appendChild(row);
+      });
+    }
+
+    function createTeamButtons() {
+      const container = document.getElementById("teamButtons");
+      allTeams.forEach(team => {
+        const btn = document.createElement("button");
+        btn.textContent = team;
+        btn.onclick = () => filterForTeam(team);
+        container.appendChild(btn);
+      });
+
+      const resetBtn = document.createElement("button");
+      resetBtn.textContent = "Alle anzeigen";
+      resetBtn.onclick = () => filterForTeam(null);
+      container.appendChild(resetBtn);
+    }
+
+    function filterForTeam(team) {
+      // Markieren in Gruppen
+      document.querySelectorAll("tbody tr").forEach(row => {
+        row.classList.remove("highlight");
+        if (row.getAttribute("data-team") === team) {
+          row.classList.add("highlight");
+        }
+      });
+
+      // Spiele filtern
+      document.querySelectorAll("#matchBody tr").forEach(row => {
+        const teams = row.getAttribute("data-teams");
+        if (!team || teams.includes(team)) {
+          row.classList.remove("hidden");
+        } else {
+          row.classList.add("hidden");
+        }
+      });
+    }
+
+    createTeamTable(teamsA, "groupABody");
+    createTeamTable(teamsB, "groupBBody");
+    populateMatches();
+    createTeamButtons();
+  </script>
+</body>
+</html>
