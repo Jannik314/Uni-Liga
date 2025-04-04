@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ligaplaner</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 2rem; background: #f4f6f9; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: white; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: center; }
+    /* Neue Farbgebung: Dunkles Blau für Header */
+    th { background-color: #003366; color: white; }
+    /* Entferne die orange Alternierung – Zeilen bleiben weiß */
+    /* tr:nth-child(even) { background-color: #FFCC80; } */
+    /* Markierung der gefilterten Teams nun in Orange */
+    .highlight { background-color: orange; }
+    .result-input input { width: 40px; text-align: center; }
+    .hidden { display: none; }
+    #teamList input { margin: 2px; padding: 5px 10px; }
+    #spieltagDatumWrapper { margin-bottom: 10px; }
+    #logo { text-align: center; margin-bottom: 20px; }
+    img { max-width: 200px; height: auto; }
+    /* Hamburger-Menü und Sidebar */
+    #hamburgerIcon {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      font-size: 30px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: -250px;
+      width: 250px;
+      height: 100%;
+      background-color: #fff;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+      padding: 10px;
+      transition: left 0.3s ease;
+      z-index: 999;
+    }
+    #sidebar.open {
+      left: 0;
+    }
+    #sidebar h2 {
+      margin-top: 0;
+    }
+    #sidebar ul {
+      list-style: none;
+      padding: 0;
+    }
+    #sidebar li {
+      padding: 8px;
+      cursor: pointer;
+      border-bottom: 1px solid #ccc;
+    }
+    #sidebar li:hover {
+      background-color: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Hamburger-Menü Icon -->
+  <div id="hamburgerIcon" onclick="toggleSidebar()">&#9776;</div>
+  <!-- Sidebar für Teamfilter mit integriertem Filter-Zurücksetzen und Schließen -->
+  <div id="sidebar">
+    <span id="closeSidebar" onclick="toggleSidebar()" style="cursor:pointer; float:right; font-size:30px;">&times;</span>
+    <h2>Teams</h2>
+    <ul id="sidebarList"></ul>
+    <button id="clearFilterButtonSidebar" onclick="clearFilter()">Filter zurücksetzen</button>
+  </div>
+
+  <!-- Logo im Header -->
+  <div id="logo">
+    <img src="Image.png" alt="Campusliga Logo">
+  </div>
+  
+  <h1 style="text-align:center;">Liga-Spielplan</h1>
+  <!-- Bereich für zentrale Teamnamen-Editierung (nur im Admin-Modus sichtbar) -->
+  <div id="teamList" class="hidden"></div>
+
+  <!-- Teamstatistik-Tabelle -->
+  <div id="teamStatistik"></div>
+
+  <div style="text-align:center; margin-bottom: 1rem;" id="navigationControls">
+    <button onclick="vorherigerSpieltag()">⬅️</button>
+    <span id="spieltagLabel">Spieltag 1</span>
+    <button onclick="naechsterSpieltag()">➡️</button>
+  </div>
+
+  <div style="text-align:center; margin-bottom: 1rem;" id="spieltagDatumWrapper" class="hidden">
+    <label for="spieltagDatum">Datum:</label>
+    <input type="text" id="spieltagDatum" onchange="updateSpieltagDatum()" />
+  </div>
+  <div id="anzeigeDatum" style="text-align:center; margin-bottom:10px;"></div>
+
+  <table id="spieltagTabelle">
+    <thead>
+      <tr><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th></tr>
+    </thead>
+    <tbody id="spieltagBody"></tbody>
+  </table>
+
+  <div style="margin-top:2rem; text-align:center;">
+    <input type="password" id="adminPinInput" placeholder="Admin PIN" />
+    <button onclick="toggleAdmin()">Anmelden</button>
+    <button id="saveButton" onclick="saveAllSpieltagErgebnisse()" style="display:none;">Speichern</button>
+  </div>
+
+  <!-- Firebase Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // Firebase-Konfiguration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAsneYTXmT7JDUewiJ09LUg1QSZK6Rj_8",
+      authDomain: "uni-liga.firebaseapp.com",
+      projectId: "uni-liga",
+      storageBucket: "uni-liga.appspot.com",
+      messagingSenderId: "196698710621",
+      appId: "1:196698710621:web:66d13babfc997bab5a3b4"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let isAdmin = false;
+    let aktuellerSpieltag = 0;
+    let currentFilterTeam = null; // Aktuell ausgewähltes Team zum Filtern (null = kein Filter)
+    let teams = {}; // Zentrales Teamverzeichnis: teamID -> Teamname
+
+    const spieltage = [
+  // SPIELTAG 1
+  {
+    nummer: 1,
+    datum: "",
+    spiele: [
+      { zeit: "16:15", teamA: "T5", teamB: "T6", goalsA: "", goalsB: "" },
+      { zeit: "16:15", teamA: "T7", teamB: "T8", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T9", teamB: "T10", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T11", teamB: "T12", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T13", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T15", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T7", teamB: "T15", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T5", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T8", teamB: "T9", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T6", teamB: "T11", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T10", teamB: "T13", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T12", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T5", teamB: "T8", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T6", teamB: "T9", goalsA: "", goalsB: "" },
+      { zeit: "18:35", teamA: "T10", teamB: "T7", goalsA: "", goalsB: "" }
+    ]
+  },
+  // SPIELTAG 2
+  {
+    nummer: 2,
+    datum: "",
+    spiele: [
+      { zeit: "16:15", teamA: "T1", teamB: "T2", goalsA: "", goalsB: "" },
+      { zeit: "16:15", teamA: "T3", teamB: "T4", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T9", teamB: "T15", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T10", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T11", teamB: "T13", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T12", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T1", teamB: "T11", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T3", teamB: "T13", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T2", teamB: "T15", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T4", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T9", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T10", teamB: "T12", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T9", teamB: "T2", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T13", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "18:35", teamA: "T1", teamB: "T12", goalsA: "", goalsB: "" }
+    ]
+  },
+  // SPIELTAG 3
+  {
+    nummer: 3,
+    datum: "",
+    spiele: [
+      { zeit: "16:15", teamA: "T1", teamB: "T5", goalsA: "", goalsB: "" },
+      { zeit: "16:15", teamA: "T2", teamB: "T6", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T3", teamB: "T7", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T4", teamB: "T8", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T15", teamB: "T13", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T14", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T4", teamB: "T6", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T3", teamB: "T5", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T2", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T1", teamB: "T13", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T7", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T8", teamB: "T15", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T14", teamB: "T5", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T2", teamB: "T12", goalsA: "", goalsB: "" },
+      { zeit: "18:35", teamA: "T15", teamB: "T1", goalsA: "", goalsB: "" }
+    ]
+  },
+  // SPIELTAG 4
+  {
+    nummer: 4,
+    datum: "",
+    spiele: [
+      { zeit: "16:15", teamA: "T5", teamB: "T10", goalsA: "", goalsB: "" },
+      { zeit: "16:15", teamA: "T6", teamB: "T12", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T7", teamB: "T9", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T8", teamB: "T11", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T1", teamB: "T3", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T2", teamB: "T4", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T6", teamB: "T8", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T7", teamB: "T5", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T11", teamB: "T3", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T10", teamB: "T2", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T12", teamB: "T4", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T1", teamB: "T9", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T7", teamB: "T4", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T9", teamB: "T3", goalsA: "", goalsB: "" },
+      { zeit: "18:35", teamA: "T8", teamB: "T1", goalsA: "", goalsB: "" }
+    ]
+  },
+  // SPIELTAG 5
+  {
+    nummer: 5,
+    datum: "",
+    spiele: [
+      { zeit: "16:15", teamA: "T2", teamB: "T11", goalsA: "", goalsB: "" },
+      { zeit: "16:15", teamA: "T3", teamB: "T15", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T12", teamB: "T7", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T6", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T8", teamB: "T10", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T4", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T12", teamB: "T3", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T8", teamB: "T2", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T6", teamB: "T7", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T10", teamB: "T4", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T15", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T11", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T3", teamB: "T10", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T14", teamB: "T11", goalsA: "", goalsB: "" },
+      { zeit: "18:35", teamA: "T2", teamB: "T16", goalsA: "", goalsB: "" }
+    ]
+  },
+  // SPIELTAG 6
+  {
+    nummer: 6,
+    datum: "",
+    spiele: [
+      { zeit: "16:15", teamA: "T7", teamB: "T1", goalsA: "", goalsB: "" },
+      { zeit: "16:15", teamA: "T3", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T5", teamB: "T4", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T15", teamB: "T11", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T13", teamB: "T8", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T9", teamB: "T12", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T1", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T7", teamB: "T11", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T8", teamB: "T3", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T12", teamB: "T15", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T4", teamB: "T13", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T5", teamB: "T9", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T13", teamB: "T7", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T4", teamB: "T11", goalsA: "", goalsB: "" },
+      { zeit: "18:35", teamA: "T15", teamB: "T4", goalsA: "", goalsB: "" }
+    ]
+  },
+  // SPIELTAG 7
+  {
+    nummer: 7,
+    datum: "",
+    spiele: [
+      { zeit: "16:15", teamA: "T13", teamB: "T2", goalsA: "", goalsB: "" },
+      { zeit: "16:15", teamA: "T4", teamB: "T1", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T16", teamB: "T9", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T6", teamB: "T10", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T8", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T5", teamB: "T12", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T6", teamB: "T13", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T4", teamB: "T9", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T2", teamB: "T5", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T12", teamB: "T8", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T1", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T16", teamB: "T10", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T8", teamB: "T16", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T12", teamB: "T13", goalsA: "", goalsB: "" },
+      { zeit: "18:35", teamA: "T6", teamB: "T14", goalsA: "", goalsB: "" }
+    ]
+  },
+  // SPIELTAG 8
+  {
+    nummer: 8,
+    datum: "",
+    spiele: [
+      { zeit: "16:15", teamA: "T5", teamB: "T11", goalsA: "", goalsB: "" },
+      { zeit: "16:15", teamA: "T2", teamB: "T7", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T6", teamB: "T1", goalsA: "", goalsB: "" },
+      { zeit: "16:35", teamA: "T3", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T13", teamB: "T9", goalsA: "", goalsB: "" },
+      { zeit: "16:55", teamA: "T15", teamB: "T10", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T14", teamB: "T7", goalsA: "", goalsB: "" },
+      { zeit: "17:15", teamA: "T2", teamB: "T3", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T13", teamB: "T5", goalsA: "", goalsB: "" },
+      { zeit: "17:35", teamA: "T10", teamB: "T15", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T11", teamB: "T9", goalsA: "", goalsB: "" },
+      { zeit: "17:55", teamA: "T6", teamB: "T14", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T15", teamB: "T5", goalsA: "", goalsB: "" },
+      { zeit: "18:15", teamA: "T3", teamB: "T6", goalsA: "", goalsB: "" },
+      { zeit: "18:35", teamA: "T10", teamB: "T11", goalsA: "", goalsB: "" }
+    ]
+  }
+]; 
+
+
+    function ladeTeamDaten() {
+      db.collection("metadata").doc("teams").get().then(doc => {
+        if (doc.exists) {
+          teams = doc.data().teams || {};
+        }
+        if (Object.keys(teams).length === 0) {
+          teams = generiereStandardTeams();
+          saveTeamsMappingToFirebase();
+        }
+        renderTeamList();
+        renderSidebarTeamList();
+        renderSpieltag();
+      }).catch(error => {
+        console.error("Fehler beim Laden der Teams:", error);
+        teams = generiereStandardTeams();
+        renderTeamList();
+        renderSidebarTeamList();
+        renderSpieltag();
+      });
+    }
+
+    function generiereStandardTeams() {
+      let standardTeams = {};
+      spieltage.forEach(tag => {
+        tag.spiele.forEach(spiel => {
+          if (!standardTeams[spiel.teamA]) {
+            standardTeams[spiel.teamA] = spiel.teamA;
+          }
+          if (!standardTeams[spiel.teamB]) {
+            standardTeams[spiel.teamB] = spiel.teamB;
+          }
+        });
+      });
+      return standardTeams;
+    }
+
+    function saveTeamsMappingToFirebase() {
+      db.collection("metadata").doc("teams").set({ teams: teams }, { merge: true })
+        .then(() => {
+          console.log("Teams mapping gespeichert!");
+        })
+        .catch(error => {
+          console.error("Fehler beim Speichern des Teams Mapping:", error);
+        });
+    }
+
+    function renderTeamList() {
+      const teamListDiv = document.getElementById("teamList");
+      if (isAdmin) {
+        teamListDiv.classList.remove("hidden");
+        teamListDiv.innerHTML = "<h2>Teams bearbeiten</h2>";
+        for (const teamID in teams) {
+          const container = document.createElement("div");
+          container.style.marginBottom = "5px";
+          container.innerHTML = `<label style="margin-right:10px;">${teamID}:</label>`;
+          const input = document.createElement("input");
+          input.value = teams[teamID];
+          input.onchange = () => {
+            teams[teamID] = input.value;
+            saveTeamsMappingToFirebase();
+            renderTeamList();
+            renderSidebarTeamList();
+            renderSpieltag();
+          };
+          container.appendChild(input);
+          teamListDiv.appendChild(container);
+        }
+      } else {
+        teamListDiv.classList.add("hidden");
+      }
+    }
+
+    function renderSidebarTeamList() {
+      const sidebarUl = document.getElementById("sidebarList");
+      sidebarUl.innerHTML = "";
+      for (const teamID in teams) {
+        const li = document.createElement("li");
+        li.textContent = teams[teamID];
+        li.onclick = function() { filterByTeam(teamID); };
+        sidebarUl.appendChild(li);
+      }
+    }
+
+    function toggleAdmin() {
+      const pin = document.getElementById("adminPinInput").value;
+      if (pin === "3141") {
+        isAdmin = true;
+        document.getElementById("saveButton").style.display = "inline-block";
+      } else {
+        alert("Falscher PIN");
+      }
+      renderTeamList();
+      renderSpieltag();
+    }
+
+    function renderSpieltag() {
+      const table = document.getElementById("spieltagTabelle");
+      const tbody = document.getElementById("spieltagBody");
+
+      if (currentFilterTeam) {
+        document.getElementById("spieltagLabel").style.display = "none";
+        document.getElementById("navigationControls").style.display = "none";
+        document.getElementById("spieltagDatumWrapper").style.display = "none";
+        table.querySelector("thead").innerHTML = `<tr>
+          <th>Spieltag</th>
+          <th>Zeit</th>
+          <th>Team A</th>
+          <th>Team B</th>
+          <th>Ergebnis</th>
+        </tr>`;
+        tbody.innerHTML = "";
+        spieltage.forEach(tag => {
+          tag.spiele.forEach((spiel, index) => {
+            if (spiel.teamA === currentFilterTeam || spiel.teamB === currentFilterTeam) {
+              const row = document.createElement("tr");
+              const displayTeamA = teams[spiel.teamA] || spiel.teamA;
+              const displayTeamB = teams[spiel.teamB] || spiel.teamB;
+              const teamAClass = spiel.teamA === currentFilterTeam ? "highlight" : "";
+              const teamBClass = spiel.teamB === currentFilterTeam ? "highlight" : "";
+              let ergebnisHTML = "-";
+              if (isAdmin) {
+                ergebnisHTML = `
+                  <div class="result-input">
+                    <input type="number" min="0" value="${spiel.goalsA}" onchange="updateGame(${tag.nummer-1}, ${index}, 'goalsA', this.value)" />
+                    <span>:</span>
+                    <input type="number" min="0" value="${spiel.goalsB}" onchange="updateGame(${tag.nummer-1}, ${index}, 'goalsB', this.value)" />
+                  </div>`;
+              } else if (spiel.goalsA !== "" && spiel.goalsB !== "") {
+                ergebnisHTML = `${spiel.goalsA} : ${spiel.goalsB}`;
+              }
+              row.innerHTML = `<td>${tag.nummer}</td>
+                <td>${spiel.zeit}</td>
+                <td class="${teamAClass}">${displayTeamA}</td>
+                <td class="${teamBClass}">${displayTeamB}</td>
+                <td>${ergebnisHTML}</td>`;
+              tbody.appendChild(row);
+            }
+          });
+        });
+      } else {
+        document.getElementById("spieltagLabel").style.display = "inline";
+        document.getElementById("navigationControls").style.display = "block";
+        if (isAdmin) {
+          document.getElementById("spieltagDatumWrapper").style.display = "block";
+        } else {
+          document.getElementById("spieltagDatumWrapper").style.display = "none";
+        }
+        table.querySelector("thead").innerHTML = `<tr><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th></tr>`;
+        const tag = spieltage[aktuellerSpieltag];
+        document.getElementById("spieltagLabel").textContent = `Spieltag ${tag.nummer}`;
+        if (isAdmin) {
+          document.getElementById("spieltagDatum").value = tag.datum;
+        }
+        document.getElementById("anzeigeDatum").textContent = (!isAdmin && tag.datum) ? `Datum: ${tag.datum}` : "";
+        tbody.innerHTML = "";
+        tag.spiele.forEach((spiel, index) => {
+          const row = document.createElement("tr");
+          const displayTeamA = teams[spiel.teamA] || spiel.teamA;
+          const displayTeamB = teams[spiel.teamB] || spiel.teamB;
+          let ergebnisHTML = "-";
+          if (isAdmin) {
+            ergebnisHTML = `
+              <div class="result-input">
+                <input type="number" min="0" value="${spiel.goalsA}" onchange="spieltage[${aktuellerSpieltag}].spiele[${index}].goalsA = this.value" />
+                <span>:</span>
+                <input type="number" min="0" value="${spiel.goalsB}" onchange="spieltage[${aktuellerSpieltag}].spiele[${index}].goalsB = this.value" />
+              </div>`;
+          } else if (spiel.goalsA !== "" && spiel.goalsB !== "") {
+            ergebnisHTML = `${spiel.goalsA} : ${spiel.goalsB}`;
+          }
+          row.innerHTML = `
+            <td>${spiel.zeit}</td>
+            <td>${displayTeamA}</td>
+            <td>${displayTeamB}</td>
+            <td>${ergebnisHTML}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+      berechneStatistik();
+    }
+
+    function updateGame(spieltagIndex, spielIndex, field, value) {
+      spieltage[spieltagIndex].spiele[spielIndex][field] = value;
+    }
+
+    function berechneStatistik() {
+      const teamStats = {};
+      for (const teamID in teams) {
+        teamStats[teamID] = { siege: 0, niederlagen: 0, tore: 0, gegentore: 0, punkte: 0 };
+      }
+      spieltage.forEach(tag => {
+        tag.spiele.forEach(spiel => {
+          const { teamA, teamB, goalsA, goalsB } = spiel;
+          if (!teamStats[teamA]) teamStats[teamA] = { siege: 0, niederlagen: 0, tore: 0, gegentore: 0, punkte: 0 };
+          if (!teamStats[teamB]) teamStats[teamB] = { siege: 0, niederlagen: 0, tore: 0, gegentore: 0, punkte: 0 };
+          if (goalsA !== "" && goalsB !== "") {
+            const gA = parseInt(goalsA), gB = parseInt(goalsB);
+            teamStats[teamA].tore += gA;
+            teamStats[teamA].gegentore += gB;
+            teamStats[teamB].tore += gB;
+            teamStats[teamB].gegentore += gA;
+            if (gA > gB) { 
+              teamStats[teamA].siege++;
+              teamStats[teamA].punkte += 1; 
+              teamStats[teamB].niederlagen++; 
+            } else if (gA < gB) { 
+              teamStats[teamB].siege++;
+              teamStats[teamB].punkte += 1; 
+              teamStats[teamA].niederlagen++; 
+            }
+          }
+        });
+      });
+      const sortiert = Object.entries(teamStats).sort((a, b) => {
+        if (b[1].siege !== a[1].siege) return b[1].siege - a[1].siege;
+        const ratioA = a[1].gegentore ? a[1].tore / a[1].gegentore : (a[1].tore > 0 ? Infinity : 0);
+        const ratioB = b[1].gegentore ? b[1].tore / b[1].gegentore : (b[1].tore > 0 ? Infinity : 0);
+        return ratioB - ratioA;
+      });
+      const tabelleHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th>Siege</th>
+              <th>Niederlagen</th>
+              <th>Punkte</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortiert.map(([team, stat]) => `<tr><td>${teams[team] || team}</td><td>${stat.siege}</td><td>${stat.niederlagen}</td><td>${stat.punkte}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+      document.getElementById("teamStatistik").innerHTML = tabelleHTML;
+    }
+
+    function vorherigerSpieltag() {
+      if (aktuellerSpieltag > 0) {
+        aktuellerSpieltag--;
+        renderSpieltag();
+      }
+    }
+
+    function naechsterSpieltag() {
+      if (aktuellerSpieltag < spieltage.length - 1) {
+        aktuellerSpieltag++;
+        renderSpieltag();
+      }
+    }
+
+    function updateSpieltagDatum() {
+      const input = document.getElementById("spieltagDatum");
+      spieltage[aktuellerSpieltag].datum = input.value;
+    }
+
+    function saveAllSpieltagErgebnisse() {
+      const batch = db.batch();
+      spieltage.forEach((tag) => {
+        tag.spiele.forEach((spiel, spielIndex) => {
+          const id = `spieltag${tag.nummer}_spiel${spielIndex}`;
+          const ref = db.collection("ligaspiele").doc(id);
+          batch.set(ref, {
+            spieltag: tag.nummer,
+            datum: tag.datum,
+            zeit: spiel.zeit,
+            teamA: spiel.teamA,
+            teamB: spiel.teamB,
+            goalsA: spiel.goalsA,
+            goalsB: spiel.goalsB
+          }, { merge: true });
+        });
+      });
+      batch.commit().then(() => alert("Alle Spieltage gespeichert!"));
+    }
+
+    function filterByTeam(teamID) {
+      currentFilterTeam = teamID;
+      toggleSidebar(); // Sidebar schließen
+      renderSpieltag();
+    }
+
+    function clearFilter() {
+      currentFilterTeam = null;
+      renderSpieltag();
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      sidebar.classList.toggle("open");
+      const hamburgerIcon = document.getElementById("hamburgerIcon");
+      if (sidebar.classList.contains("open")) {
+        hamburgerIcon.style.display = "none";
+      } else {
+        hamburgerIcon.style.display = "block";
+      }
+    }
+
+    function ladeAlleDaten() {
+      ladeTeamDaten();
+      const promises = [];
+      spieltage.forEach((tag) => {
+        tag.spiele.forEach((spiel, spielIndex) => {
+          const docId = `spieltag${tag.nummer}_spiel${spielIndex}`;
+          const promise = db.collection("ligaspiele").doc(docId).get().then(doc => {
+            if (doc.exists) {
+              const data = doc.data();
+              if (data.goalsA !== undefined) spiel.goalsA = data.goalsA;
+              if (data.goalsB !== undefined) spiel.goalsB = data.goalsB;
+              if (data.datum) tag.datum = data.datum;
+            }
+          }).catch(error => {
+            console.error("Fehler beim Laden von " + docId, error);
+          });
+          promises.push(promise);
+        });
+      });
+      Promise.all(promises).then(() => {
+        renderSpieltag();
+      });
+    }
+
+    ladeAlleDaten();
+  </script>
+</body>
+</html>
