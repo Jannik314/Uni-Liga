@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sportauswahl</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #f4f6f9;
+      text-align: center;
+    }
+    .sport-option {
+      display: inline-block;
+      margin: 20px;
+      padding: 20px;
+      border: 2px solid #003366;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.3s;
+      width: 200px;
+    }
+    .sport-option:hover {
+      background: #e0e0e0;
+    }
+    .sport-option img {
+      max-width: 100px;
+      height: auto;
+    }
+    .sport-option h2 {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Wähle deine Sportart</h1>
+  <div class="sport-option" onclick="window.location.href='volleyball.html'">
+    <img src="volleyball_icon.png" alt="Volleyball">
+    <h2>Volleyball</h2>
+  </div>
+  <div class="sport-option" onclick="window.location.href='fussball.html'">
+    <img src="fussball_icon.png" alt="Fußball">
+    <h2>Fußball</h2>
+  </div>
+</body>
+</html>
