@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ligaplaner – Turnier</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 2rem; background: #f4f6f9; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: white; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: center; }
+    th { background-color: #003366; color: white; }
+    .highlight { background-color: orange; }
+    .result-input input { width: 40px; text-align: center; }
+    .hidden { display: none; }
+    #teamList input { margin: 2px; padding: 5px 10px; }
+    #spieltagDatumWrapper { margin-bottom: 10px; }
+    #logo { text-align: center; margin-bottom: 20px; }
+    img { max-width: 200px; height: auto; }
+    /* Hamburger-Menü und Sidebar */
+    #hamburgerIcon {
+      position: fixed;
+      top: 10px;
+      left: 20px;
+      font-size: 30px;
+      cursor: pointer;
+      z-index: 999;
+    }
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: -250px;
+      width: 250px;
+      height: 100%;
+      background-color: #fff;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+      padding: 10px;
+      transition: left 0.3s ease;
+      z-index: 1001;
+    }
+    #sidebar.open { left: 0; }
+    #sidebar h2 { margin-top: 0; }
+    #sidebar ul { list-style: none; padding: 0; }
+    #sidebar li {
+      padding: 8px;
+      cursor: pointer;
+      border-bottom: 1px solid #ccc;
+    }
+    #sidebar li:hover { background-color: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <!-- Hamburger-Menü Icon -->
+  <div id="hamburgerIcon" onclick="toggleSidebar()">&#9776;</div>
+  <!-- Sidebar: Zeigt ausschließlich die 16 Teams (A1–A8 & B1–B8) -->
+  <div id="sidebar">
+    <span id="closeSidebar" onclick="toggleSidebar()" style="cursor:pointer; float:right; font-size:30px;">&times;</span>
+    <h2>Teams</h2>
+    <ul id="sidebarList"></ul>
+    <button id="clearFilterButtonSidebar" onclick="clearFilter()">Filter zurücksetzen</button>
+  </div>
+
+  <!-- Logo -->
+  <div id="logo">
+    <img src="Image.png" alt="Campusliga Logo">
+  </div>
+
+  <h1 style="text-align:center;">Ligaplaner – Turnier</h1>
+  <!-- Adminbereich: Bearbeitung der Teams (sichtbar im Admin-Modus) -->
+  <div id="teamList" class="hidden"></div>
+  <!-- Optional: Gesamte Teamstatistik -->
+  <div id="teamStatistik"></div>
+  <!-- Navigation -->
+  <div style="text-align:center; margin-bottom: 1rem;" id="navigationControls">
+    <button onclick="vorherigerSpieltag()">⬅️</button>
+    <span id="spieltagLabel">Spieltag 1</span>
+    <button onclick="naechsterSpieltag()">➡️</button>
+  </div>
+  <div style="text-align:center; margin-bottom: 1rem;" id="spieltagDatumWrapper" class="hidden">
+    <label for="spieltagDatum">Datum:</label>
+    <input type="text" id="spieltagDatum" onchange="updateSpieltagDatum()" />
+  </div>
+  <div id="anzeigeDatum" style="text-align:center; margin-bottom:10px;"></div>
+  
+  <!-- Container für die dynamisch generierten Tabellen des jeweiligen Spieltags -->
+  <div id="spieltagTabelleContainer"></div>
+
+  <div style="margin-top:2rem; text-align:center;">
+    <input type="password" id="adminPinInput" placeholder="Admin PIN" />
+    <button onclick="toggleAdmin()">Anmelden</button>
+    <button id="saveButton" onclick="saveAllSpieltagErgebnisse()" style="display:none;">Speichern</button>
+  </div>
+
+  <!-- Firebase Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script>
+    // Firebase-Konfiguration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAsneYTXmT7JDUewiJ09LUg1QSZK6Rj_8",
+      authDomain: "uni-liga.firebaseapp.com",
+      projectId: "uni-liga",
+      storageBucket: "uni-liga.appspot.com",
+      messagingSenderId: "196698710621",
+      appId: "1:196698710621:web:66d13babfc997bab5a3b4"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let isAdmin = false;
+    let aktuellerSpieltag = 0;
+    let teams = {}; // 16 Teams: A1–A8 und B1–B8
+
+    /* Spieltag-Definitionen gemäß Modell:
+       - Spieltag 1: Gruppe A, Runde 1 (feste Fixtures: A1–A8)
+       - Spieltag 2: Gruppe B, Runde 1 (feste Fixtures: B1–B8)
+       - Spieltag 3: Gruppe A, Runde 2 (feste Fixtures)
+       - Spieltag 4: Gruppe B, Runde 2 (feste Fixtures)
+       - Spieltag 5: Loser-Runde 1 (automatisch: Platz 5-8 aus Gruppe A und B)
+       - Spieltag 6: Winner-Runde 1 (automatisch: Platz 1-4 aus Gruppe A und B)
+       - Spieltag 7: Loser-Runde 2 (automatisch: neu basierend auf bisherigen Ergebnissen)
+       - Spieltag 8: Winner-Runde 2 (automatisch: neu basierend auf bisherigen Ergebnissen)
+       - Spieltag 9: Finale – hier können im Admin-Modus alle 16 Teams frei eingetragen werden (16 Zeilen)
+    */
+    const spieltage = [
+      { nummer: 1, datum: "", spiele: [
+         { zeit: "16:15", teamA: "A1", teamB: "A2", goalsA: "", goalsB: "" },
+         { zeit: "16:35", teamA: "A3", teamB: "A4", goalsA: "", goalsB: "" },
+         { zeit: "16:55", teamA: "A5", teamB: "A6", goalsA: "", goalsB: "" },
+         { zeit: "17:15", teamA: "A7", teamB: "A8", goalsA: "", goalsB: "" }
+      ]},
+      { nummer: 2, datum: "", spiele: [
+         { zeit: "16:15", teamA: "B1", teamB: "B2", goalsA: "", goalsB: "" },
+         { zeit: "16:35", teamA: "B3", teamB: "B4", goalsA: "", goalsB: "" },
+         { zeit: "16:55", teamA: "B5", teamB: "B6", goalsA: "", goalsB: "" },
+         { zeit: "17:15", teamA: "B7", teamB: "B8", goalsA: "", goalsB: "" }
+      ]},
+      { nummer: 3, datum: "", spiele: [
+         { zeit: "16:15", teamA: "A2", teamB: "A3", goalsA: "", goalsB: "" },
+         { zeit: "16:35", teamA: "A4", teamB: "A5", goalsA: "", goalsB: "" },
+         { zeit: "16:55", teamA: "A6", teamB: "A7", goalsA: "", goalsB: "" },
+         { zeit: "17:15", teamA: "A8", teamB: "A1", goalsA: "", goalsB: "" }
+      ]},
+      { nummer: 4, datum: "", spiele: [
+         { zeit: "16:15", teamA: "B2", teamB: "B3", goalsA: "", goalsB: "" },
+         { zeit: "16:35", teamA: "B4", teamB: "B5", goalsA: "", goalsB: "" },
+         { zeit: "16:55", teamA: "B6", teamB: "B7", goalsA: "", goalsB: "" },
+         { zeit: "17:15", teamA: "B8", teamB: "B1", goalsA: "", goalsB: "" }
+      ]},
+      { nummer: 5, datum: "" }, // Loser-Runde 1: Wird automatisch aus den Ergebnissen der Spieltage 1 und 2 berechnet
+      { nummer: 6, datum: "" }, // Winner-Runde 1: Automatisch aus den Ergebnissen der Spieltage 1 und 2
+      { nummer: 7, datum: "" }, // Loser-Runde 2: Automatisch neu berechnet
+      { nummer: 8, datum: "" }, // Winner-Runde 2: Automatisch neu berechnet
+      { nummer: 9, datum: "" }  // Finale: Freie Eintragung (16 Zeilen, im Admin-Modus editierbar)
+    ];
+
+    // Teams laden – entweder aus Firebase oder als Standard 16 Teams (A1–A8, B1–B8)
+    function ladeTeamDaten() {
+      db.collection("metadata").doc("teams").get().then(doc => {
+        if (doc.exists) {
+          teams = doc.data().teams || {};
+        }
+        if (Object.keys(teams).length === 0) {
+          teams = generiereStandardTeams();
+          saveTeamsMappingToFirebase();
+        }
+        renderTeamList();
+        renderSidebarTeamList();
+        renderSpieltag();
+      }).catch(error => {
+        console.error("Fehler beim Laden der Teams:", error);
+        teams = generiereStandardTeams();
+        renderTeamList();
+        renderSidebarTeamList();
+        renderSpieltag();
+      });
+    }
+
+    function generiereStandardTeams() {
+      let standardTeams = {};
+      for (let i = 1; i <= 8; i++) {
+        standardTeams["A" + i] = "Team A" + i;
+        standardTeams["B" + i] = "Team B" + i;
+      }
+      return standardTeams;
+    }
+
+    function saveTeamsMappingToFirebase() {
+      db.collection("metadata").doc("teams").set({ teams: teams }, { merge: true })
+        .then(() => { console.log("Teams mapping gespeichert!"); })
+        .catch(error => { console.error("Fehler beim Speichern des Teams Mapping:", error); });
+    }
+
+    function renderTeamList() {
+      const teamListDiv = document.getElementById("teamList");
+      if (isAdmin) {
+        teamListDiv.classList.remove("hidden");
+        teamListDiv.innerHTML = "<h2>Teams bearbeiten</h2>";
+        for (const teamID in teams) {
+          const container = document.createElement("div");
+          container.style.marginBottom = "5px";
+          container.innerHTML = `<label style="margin-right:10px;">${teamID}:</label>`;
+          const input = document.createElement("input");
+          input.value = teams[teamID];
+          input.onchange = () => {
+            teams[teamID] = input.value;
+            saveTeamsMappingToFirebase();
+            renderTeamList();
+            renderSidebarTeamList();
+            renderSpieltag();
+          };
+          container.appendChild(input);
+          teamListDiv.appendChild(container);
+        }
+      } else {
+        teamListDiv.classList.add("hidden");
+      }
+    }
+
+    // In der Sidebar werden ausschließlich die 16 Teams (A1–A8 und B1–B8) angezeigt.
+    function renderSidebarTeamList() {
+      const sidebarUl = document.getElementById("sidebarList");
+      sidebarUl.innerHTML = "";
+      for (const teamID in teams) {
+        if (teamID.startsWith("A") || teamID.startsWith("B")) {
+          let li = document.createElement("li");
+          li.textContent = teams[teamID];
+          sidebarUl.appendChild(li);
+        }
+      }
+    }
+
+    function toggleAdmin() {
+      const pin = document.getElementById("adminPinInput").value;
+      if (pin === "3141") {
+        isAdmin = true;
+        document.getElementById("saveButton").style.display = "inline-block";
+      } else {
+        alert("Falscher PIN");
+      }
+      renderTeamList();
+      renderSpieltag();
+    }
+
+    // Für Gruppe A (Spieltage 1 und 3) bzw. Gruppe B (Spieltage 2 und 4) wird basierend auf den erfassten Ergebnissen eine Statistik berechnet.
+    function computeGroupStats(prefix) {
+      let stats = {};
+      for (const teamID in teams) {
+        if (teamID.startsWith(prefix)) {
+          stats[teamID] = { siege: 0, tore: 0, gegentore: 0 };
+        }
+      }
+      // Für Gruppe A: Spieltage 1 und 3, für Gruppe B: Spieltage 2 und 4
+      let indices = prefix === "A" ? [0, 2] : [1, 3];
+      indices.forEach(idx => {
+        if (spieltage[idx] && spieltage[idx].spiele) {
+          spieltage[idx].spiele.forEach(match => {
+            if (match.teamA.startsWith(prefix) && match.teamB.startsWith(prefix)) {
+              let gA = parseInt(match.goalsA) || 0;
+              let gB = parseInt(match.goalsB) || 0;
+              stats[match.teamA].tore += gA;
+              stats[match.teamA].gegentore += gB;
+              stats[match.teamB].tore += gB;
+              stats[match.teamB].gegentore += gA;
+              if (gA > gB) {
+                stats[match.teamA].siege++;
+              } else if (gA < gB) {
+                stats[match.teamB].siege++;
+              }
+            }
+          });
+        }
+      });
+      return stats;
+    }
+    
+    function rankingComparison(statA, statB) {
+      if (statA.siege !== statB.siege) return statB.siege - statA.siege;
+      let gdA = statA.tore - statA.gegentore;
+      let gdB = statB.tore - statB.gegentore;
+      return gdB - gdA;
+    }
+
+    // Rendert den jeweiligen Spieltag:
+    // • Spieltag 1 & 3: Fixture-Tabelle für Gruppe A (feste Eintragungen)
+    // • Spieltag 2 & 4: Fixture-Tabelle für Gruppe B (feste Eintragungen)
+    // • Spieltag 5 & 7: Loser-Runde – automatisch: Platz 5-8 aus Gruppe A und B
+    // • Spieltag 6 & 8: Winner-Runde – automatisch: Platz 1-4 aus Gruppe A und B
+    // • Spieltag 9: Finale – Tabelle mit 16 Zeilen zur freien Eintragung (im Admin-Modus editierbar)
+    function renderSpieltag() {
+      const container = document.getElementById("spieltagTabelleContainer");
+      container.innerHTML = "";
+      const currentDay = spieltage[aktuellerSpieltag].nummer;
+      document.getElementById("spieltagLabel").textContent = "Spieltag " + currentDay;
+      
+      if (currentDay === 9) {
+        // Finale: 16-zeilige Tabelle für freie Eintragung
+        let table = document.createElement("table");
+        let caption = document.createElement("caption");
+        caption.textContent = "Finale – Freie Eintragung";
+        table.appendChild(caption);
+        let thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>Reihenfolge</th><th>Team</th><th>Ergebnis</th></tr>";
+        table.appendChild(thead);
+        let tbody = document.createElement("tbody");
+        for (let i = 1; i <= 16; i++) {
+          let row = document.createElement("tr");
+          row.innerHTML = `<td>${i}</td>
+                           <td>${isAdmin ? `<input type="text" value="${teams["T"+i] || ""}" onchange="teams['T'+${i}] = this.value" />` : (teams["T"+i] || "")}</td>
+                           <td>${isAdmin ? `<input type="text" placeholder="Ergebnis" />` : "-"}</td>`;
+          tbody.appendChild(row);
+        }
+        table.appendChild(tbody);
+        container.appendChild(table);
+      } else if (currentDay === 1 || currentDay === 3) {
+        // Spieltag 1 & 3: Fixture-Tabelle für Gruppe A
+        let table = document.createElement("table");
+        let caption = document.createElement("caption");
+        caption.textContent = "Gruppe A – Spieltag " + currentDay;
+        table.appendChild(caption);
+        let thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th></tr>";
+        table.appendChild(thead);
+        let tbody = document.createElement("tbody");
+        const fixtures = spieltage[aktuellerSpieltag].spiele || [];
+        fixtures.forEach((match, index) => {
+          let row = document.createElement("tr");
+          let ergebnis = "-";
+          if(isAdmin) {
+            ergebnis = `<div class="result-input">
+                          <input type="number" min="0" value="${match.goalsA}" onchange="updateGame(${aktuellerSpieltag}, ${index}, 'goalsA', this.value)" />
+                          <span>:</span>
+                          <input type="number" min="0" value="${match.goalsB}" onchange="updateGame(${aktuellerSpieltag}, ${index}, 'goalsB', this.value)" />
+                        </div>`;
+          } else if(match.goalsA !== "" && match.goalsB !== "") {
+            ergebnis = `${match.goalsA} : ${match.goalsB}`;
+          }
+          row.innerHTML = `<td>${match.zeit}</td>
+                           <td>${teams[match.teamA]}</td>
+                           <td>${teams[match.teamB]}</td>
+                           <td>${ergebnis}</td>`;
+          tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+      } else if (currentDay === 2 || currentDay === 4) {
+        // Spieltag 2 & 4: Fixture-Tabelle für Gruppe B
+        let table = document.createElement("table");
+        let caption = document.createElement("caption");
+        caption.textContent = "Gruppe B – Spieltag " + currentDay;
+        table.appendChild(caption);
+        let thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th></tr>";
+        table.appendChild(thead);
+        let tbody = document.createElement("tbody");
+        const fixtures = spieltage[aktuellerSpieltag].spiele || [];
+        fixtures.forEach((match, index) => {
+          let row = document.createElement("tr");
+          let ergebnis = "-";
+          if(isAdmin) {
+            ergebnis = `<div class="result-input">
+                          <input type="number" min="0" value="${match.goalsA}" onchange="updateGame(${aktuellerSpieltag}, ${index}, 'goalsA', this.value)" />
+                          <span>:</span>
+                          <input type="number" min="0" value="${match.goalsB}" onchange="updateGame(${aktuellerSpieltag}, ${index}, 'goalsB', this.value)" />
+                        </div>`;
+          } else if(match.goalsA !== "" && match.goalsB !== "") {
+            ergebnis = `${match.goalsA} : ${match.goalsB}`;
+          }
+          row.innerHTML = `<td>${match.zeit}</td>
+                           <td>${teams[match.teamA]}</td>
+                           <td>${teams[match.teamB]}</td>
+                           <td>${ergebnis}</td>`;
+          tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+      } else if (currentDay === 5 || currentDay === 7) {
+        // Loser-Runde: Automatisch – aus den Gruppenspielen (Platz 5-8 aus Gruppe A und B)
+        let statsA = computeGroupStats("A");
+        let statsB = computeGroupStats("B");
+        let groupA = Object.keys(statsA).sort((a, b) => rankingComparison(statsA[a], statsA[b]));
+        let groupB = Object.keys(statsB).sort((a, b) => rankingComparison(statsB[a], statsB[b]));
+        let losersA = groupA.slice(4);  // Plätze 5 bis 8
+        let losersB = groupB.slice(4);
+        let losers = losersA.concat(losersB);
+        
+        let table = document.createElement("table");
+        let caption = document.createElement("caption");
+        caption.textContent = "Losergruppe – Spieltag " + currentDay;
+        table.appendChild(caption);
+        let thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>Platz</th><th>Team</th><th>Siege</th><th>GD</th></tr>";
+        table.appendChild(thead);
+        let tbody = document.createElement("tbody");
+        losers.forEach((teamID, index) => {
+          let stat = teamID.startsWith("A") ? statsA[teamID] : statsB[teamID];
+          let gd = stat.tore - stat.gegentore;
+          let row = document.createElement("tr");
+          row.innerHTML = `<td>${index+5}</td>
+                           <td>${teams[teamID]}</td>
+                           <td>${stat.siege}</td>
+                           <td>${gd}</td>`;
+          tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+      } else if (currentDay === 6 || currentDay === 8) {
+        // Winner-Runde: Automatisch – aus den Gruppenspielen (Platz 1-4 aus Gruppe A und B)
+        let statsA = computeGroupStats("A");
+        let statsB = computeGroupStats("B");
+        let groupA = Object.keys(statsA).sort((a, b) => rankingComparison(statsA[a], statsA[b]));
+        let groupB = Object.keys(statsB).sort((a, b) => rankingComparison(statsB[a], statsB[b]));
+        let winnersA = groupA.slice(0,4);
+        let winnersB = groupB.slice(0,4);
+        let winners = winnersA.concat(winnersB);
+        
+        let table = document.createElement("table");
+        let caption = document.createElement("caption");
+        caption.textContent = "Winnergruppe – Spieltag " + currentDay;
+        table.appendChild(caption);
+        let thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>Platz</th><th>Team</th><th>Siege</th><th>GD</th></tr>";
+        table.appendChild(thead);
+        let tbody = document.createElement("tbody");
+        winners.forEach((teamID, index) => {
+          let stat = teamID.startsWith("A") ? statsA[teamID] : statsB[teamID];
+          let gd = stat.tore - stat.gegentore;
+          let row = document.createElement("tr");
+          row.innerHTML = `<td>${index+1}</td>
+                           <td>${teams[teamID]}</td>
+                           <td>${stat.siege}</td>
+                           <td>${gd}</td>`;
+          tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+      }
+      berechneStatistik();
+    }
+
+    function updateGame(spieltagIndex, spielIndex, field, value) {
+      if (spieltage[spieltagIndex].spiele) {
+        spieltage[spieltagIndex].spiele[spielIndex][field] = value;
+      }
+    }
+
+    // Eine optionale Gesamtstatistik (z. B. zur Kontrolle)
+    function berechneStatistik() {
+      const teamStats = {};
+      for (const teamID in teams) {
+        teamStats[teamID] = { siege: 0, tore: 0, gegentore: 0 };
+      }
+      // Hier werden nur die ersten 4 Spieltage (Gruppenspiele) berücksichtigt
+      for (let i = 0; i < 4; i++) {
+        if (spieltage[i] && spieltage[i].spiele) {
+          spieltage[i].spiele.forEach(match => {
+            let gA = parseInt(match.goalsA) || 0;
+            let gB = parseInt(match.goalsB) || 0;
+            teamStats[match.teamA].tore += gA;
+            teamStats[match.teamA].gegentore += gB;
+            teamStats[match.teamB].tore += gB;
+            teamStats[match.teamB].gegentore += gA;
+            if (gA > gB) {
+              teamStats[match.teamA].siege++;
+            } else if (gA < gB) {
+              teamStats[match.teamB].siege++;
+            }
+          });
+        }
+      }
+      let sorted = Object.entries(teamStats).sort((a, b) => {
+        if (b[1].siege !== a[1].siege) return b[1].siege - a[1].siege;
+        let gdA = a[1].tore - a[1].gegentore;
+        let gdB = b[1].tore - b[1].gegentore;
+        return gdB - gdA;
+      });
+      const tabelleHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th>Siege</th>
+              <th>Tore : Gegentore</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map(([team, stat]) => `<tr><td>${teams[team]}</td><td>${stat.siege}</td><td>${stat.tore} : ${stat.gegentore}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+      document.getElementById("teamStatistik").innerHTML = tabelleHTML;
+    }
+
+    function vorherigerSpieltag() {
+      if (aktuellerSpieltag > 0) {
+        aktuellerSpieltag--;
+        renderSpieltag();
+      }
+    }
+
+    function naechsterSpieltag() {
+      if (aktuellerSpieltag < spieltage.length - 1) {
+        aktuellerSpieltag++;
+        renderSpieltag();
+      }
+    }
+
+    function updateSpieltagDatum() {
+      const input = document.getElementById("spieltagDatum");
+      spieltage[aktuellerSpieltag].datum = input.value;
+    }
+
+    function saveAllSpieltagErgebnisse() {
+      const batch = db.batch();
+      spieltage.forEach((tag) => {
+        if(tag.spiele) {
+          tag.spiele.forEach((spiel, index) => {
+            const docId = `spieltag${tag.nummer}_spiel${index}`;
+            const ref = db.collection("ligaspiele").doc(docId);
+            batch.set(ref, {
+              spieltag: tag.nummer,
+              datum: tag.datum,
+              zeit: spiel.zeit,
+              teamA: spiel.teamA,
+              teamB: spiel.teamB,
+              goalsA: spiel.goalsA,
+              goalsB: spiel.goalsB
+            }, { merge: true });
+          });
+        }
+      });
+      batch.commit().then(() => alert("Alle Spieltage gespeichert!"));
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      sidebar.classList.toggle("open");
+      const hamburgerIcon = document.getElementById("hamburgerIcon");
+      hamburgerIcon.style.display = sidebar.classList.contains("open") ? "none" : "block";
+    }
+
+    // Da in diesem Modell kein Filter benötigt wird, bleibt clearFilter leer.
+    function clearFilter() {}
+
+    function ladeAlleDaten() {
+      ladeTeamDaten();
+      const promises = [];
+      // Für die ersten 4 Spieltage laden wir ggf. gespeicherte Ergebnisse
+      for (let i = 0; i < 4; i++) {
+        if (spieltage[i] && spieltage[i].spiele) {
+          spieltage[i].spiele.forEach((spiel, index) => {
+            const docId = `spieltag${spieltage[i].nummer}_spiel${index}`;
+            let promise = db.collection("ligaspiele").doc(docId).get().then(doc => {
+              if(doc.exists) {
+                let data = doc.data();
+                if(data.goalsA !== undefined) spiel.goalsA = data.goalsA;
+                if(data.goalsB !== undefined) spiel.goalsB = data.goalsB;
+                if(data.datum) spieltage[i].datum = data.datum;
+              }
+            }).catch(error => {
+              console.error("Fehler beim Laden von " + docId, error);
+            });
+            promises.push(promise);
+          });
+        }
+      }
+      Promise.all(promises).then(() => {
+        renderSpieltag();
+      });
+    }
+
+    ladeAlleDaten();
+  </script>
+</body>
+</html>
