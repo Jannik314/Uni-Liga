@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Ligaplaner – Turnier (Neu)</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 0;
+        padding: 2rem;
+        background: #f4f6f9;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        background: white;
+      }
+      th, td {
+        border: 1px solid #ccc;
+        padding: 0.5rem;
+        text-align: center;
+      }
+      th {
+        background-color: #003366;
+        color: white;
+      }
+      .highlight {
+        background-color: orange;
+      }
+      .result-input input {
+        width: 40px;
+        text-align: center;
+      }
+      .hidden {
+        display: none;
+      }
+      #teamList input {
+        margin: 2px;
+        padding: 5px 10px;
+      }
+      /* Header & Navigation Styles */
+      #header {
+        display: flex;
+        align-items: center;
+        justify-content: center; /* Zentriert den gesamten inneren Bereich */
+        gap: 20px;
+      }
+      #logo {
+        display: inline-block;
+        vertical-align: middle;
+      }
+      #logo img {
+        max-width: 200px; /* Logo ist etwas größer */
+        height: auto;
+      }
+      #header button {
+        padding: 12px 24px;
+        font-size: 1.2rem;
+        cursor: pointer;
+      }
+      /* Hamburger-Menü und Sidebar */
+      #hamburgerIcon {
+        position: fixed;
+        top: 10px;
+        left: 20px;
+        font-size: 30px;
+        cursor: pointer;
+        z-index: 999;
+      }
+      #sidebar {
+        position: fixed;
+        top: 0;
+        left: -250px;
+        width: 250px;
+        height: 100%;
+        background-color: #fff;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+        padding: 10px;
+        transition: left 0.3s ease;
+        z-index: 1001;
+      }
+      #sidebar.open {
+        left: 0;
+      }
+      #sidebar h2 {
+        margin-top: 0;
+      }
+      #sidebar ul {
+        list-style: none;
+        padding: 0;
+      }
+      #sidebar li {
+        padding: 8px;
+        cursor: pointer;
+        border-bottom: 1px solid #ccc;
+      }
+      #sidebar li:hover {
+        background-color: #f0f0f0;
+      }
+      /* Container für zwei Tabellen nebeneinander (Standings) */
+      .group-tables {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      /* Navigation (Spieltage) */
+      #navigationControls {
+        text-align: center;
+        margin-bottom: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Hamburger-Menü Icon -->
+    <div id="hamburgerIcon" onclick="toggleSidebarNeu()">&#9776;</div>
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <span id="closeSidebar" onclick="toggleSidebarNeu()" style="cursor:pointer; float:right; font-size:30px;">&times;</span>
+      <h2>Teams</h2>
+      <ul id="sidebarList"></ul>
+      <button id="clearFilterButtonSidebar" onclick="clearFilterNeu()">Filter zurücksetzen</button>
+    </div>
+    <!-- Header: Logo in der Mitte, Navigations-Buttons daneben -->
+    <div id="header">
+      <div id="logo">
+        <img src="Image.png" alt="Campusliga Logo" />
+      </div>
+      <!-- Navigations-Buttons -->
+      <div id="navigationButtons">
+        <button onclick="location.href='volleyball.html'">Vorrunde</button>
+        <button onclick="location.href='Hauptrunde.html'">Hauptrunde</button>
+        <button onclick="location.href='Playoffs.html'">Playoffs</button>
+      </div>
+    </div>
+    <!-- Versteckter Titel (optional) -->
+    <h1 style="display:none;">Ligaplaner – Turnier (Neu)</h1>
+    <!-- Adminbereich: Teams bearbeiten -->
+    <div id="teamList" class="hidden"></div>
+    <!-- Standings: Zwei Tabellen (Gruppe S und Gruppe V) -->
+    <div id="standingsContainer"></div>
+    <!-- Navigation für die Spieltagsansicht -->
+    <div id="navigationControls">
+      <button onclick="vorherigerSpieltagNeu()">⬅️</button>
+      <span id="spieltagLabel">Spieltag 1</span>
+      <button onclick="naechsterSpieltagNeu()">➡️</button>
+    </div>
+    <!-- Spieltagsansicht -->
+    <div id="spieltagContainer"></div>
+    <!-- Admin: PIN-Eingabe und Speichern -->
+    <div style="margin-top:2rem; text-align:center;">
+      <input type="password" id="adminPinInput" placeholder="Admin PIN" />
+      <button onclick="toggleAdminNeu()">Anmelden</button>
+      <button id="saveButton" onclick="saveAllSpieltagErgebnisseNeu()" style="display:none;">Speichern</button>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script>
+      // Firebase-Konfiguration – passe hier deine Werte an!
+      const firebaseConfig = {
+        apiKey: "AIzaSyAsneYTXmT7JDUewiJ09LUg1QSZK6Rj_8",
+        authDomain: "uni-liga.firebaseapp.com",
+        projectId: "uni-liga",
+        storageBucket: "uni-liga.appspot.com",
+        messagingSenderId: "196698710621",
+        appId: "1:196698710621:web:66d13babfc997bab5a3b4"
+      };
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+
+      // -----------------------------------------------
+      // Globale Variablen (neu)
+      // -----------------------------------------------
+      let isAdminNeu = false;
+      let aktuellerSpieltagNeu = 0;
+      let teamsNeu = {};
+
+      // Standardteams: Gruppe S (ehemals A) und Gruppe V (ehemals B)
+      function generiereStandardTeamsNeu() {
+        let std = {};
+        for (let i = 1; i <= 8; i++) {
+          std["S" + i] = "Team S" + i;
+          std["V" + i] = "Team V" + i;
+        }
+        return std;
+      }
+
+      // Spieltage – angepasst an die neuen Team-IDs
+      const spieltageNeu = [
+        {
+          nummer: 1,
+          datum: "",
+          spiele: [
+            { zeit: "16:15 – 16:30", teamA: "S3", teamB: "S4", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:15 – 16:30", teamA: "S5", teamB: "S6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:35 – 16:50", teamA: "S3", teamB: "S5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:35 – 16:50", teamA: "S4", teamB: "S6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:55 – 17:10", teamA: "S1", teamB: "S2", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:55 – 17:10", teamA: "S7", teamB: "S8", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:15 – 17:30", teamA: "S1", teamB: "S3", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:15 – 17:30", teamA: "S7", teamB: "S5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:35 – 17:50", teamA: "S2", teamB: "S4", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:35 – 17:50", teamA: "S8", teamB: "S6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:55 – 18:10", teamA: "S4", teamB: "S1", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:55 – 18:10", teamA: "S6", teamB: "S7", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "18:15 – 18:30", teamA: "S3", teamB: "S2", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "18:15 – 18:30", teamA: "S8", teamB: "S5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" }
+          ]
+        },
+        {
+          nummer: 2,
+          datum: "",
+          spiele: [
+            { zeit: "16:15 – 16:30", teamA: "V3", teamB: "V4", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:15 – 16:30", teamA: "V5", teamB: "V6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:35 – 16:50", teamA: "V3", teamB: "V5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:35 – 16:50", teamA: "V4", teamB: "V6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:55 – 17:10", teamA: "V1", teamB: "V2", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:55 – 17:10", teamA: "V7", teamB: "V8", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:15 – 17:30", teamA: "V1", teamB: "V3", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:15 – 17:30", teamA: "V7", teamB: "V5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:35 – 17:50", teamA: "V2", teamB: "V4", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:35 – 17:50", teamA: "V8", teamB: "V6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:55 – 18:10", teamA: "V4", teamB: "V1", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:55 – 18:10", teamA: "V6", teamB: "V7", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "18:15 – 18:30", teamA: "V3", teamB: "V2", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "18:15 – 18:30", teamA: "V8", teamB: "V5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" }
+          ]
+        },
+        {
+          nummer: 3,
+          datum: "",
+          spiele: [
+            { zeit: "16:15 – 16:30", teamA: "S1", teamB: "S8", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:15 – 16:30", teamA: "S2", teamB: "S7", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:35 – 16:50", teamA: "S1", teamB: "S7", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:35 – 16:50", teamA: "S2", teamB: "S8", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:55 – 17:10", teamA: "S3", teamB: "S6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:55 – 17:10", teamA: "S4", teamB: "S5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:15 – 17:30", teamA: "S1", teamB: "S6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:15 – 17:30", teamA: "S2", teamB: "S5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:35 – 17:50", teamA: "S7", teamB: "S3", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:35 – 17:50", teamA: "S8", teamB: "S4", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:55 – 18:10", teamA: "S1", teamB: "S5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:55 – 18:10", teamA: "S2", teamB: "S6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "18:15 – 18:30", teamA: "S7", teamB: "S4", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "18:15 – 18:30", teamA: "S8", teamB: "S3", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" }
+          ]
+        },
+        {
+          nummer: 4,
+          datum: "",
+          spiele: [
+            { zeit: "16:15 – 16:30", teamA: "V1", teamB: "V8", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:15 – 16:30", teamA: "V2", teamB: "V7", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:35 – 16:50", teamA: "V1", teamB: "V7", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:35 – 16:50", teamA: "V2", teamB: "V8", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:55 – 17:10", teamA: "V3", teamB: "V6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "16:55 – 17:10", teamA: "V4", teamB: "V5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:15 – 17:30", teamA: "V1", teamB: "V6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:15 – 17:30", teamA: "V2", teamB: "V5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:35 – 17:50", teamA: "V7", teamB: "V3", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:35 – 17:50", teamA: "V8", teamB: "V4", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:55 – 18:10", teamA: "V1", teamB: "V5", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "17:55 – 18:10", teamA: "V2", teamB: "V6", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "18:15 – 18:30", teamA: "V7", teamB: "V4", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" },
+            { zeit: "18:15 – 18:30", teamA: "V8", teamB: "V3", goalsA: "", goalsB: "", feld: "Feld 1", schiedsrichter: "" }
+          ]
+        }
+      ];
+
+      // -------------------------------------------------------
+      // Speichert die neuen Teams in einem separaten Dokument in Firebase
+      // -------------------------------------------------------
+      function saveTeamsMappingToFirebaseNeu() {
+        db.collection("metadata").doc("teams_neu").set({ teamsNeu: teamsNeu })
+          .then(() => console.log("Neue Teams-Daten wurden gespeichert!"))
+          .catch(error => console.error("Fehler beim Speichern der neuen Teams:", error));
+      }
+
+      // -------------------------------------------------------
+      // Adminmodus – Freischaltung mit PIN, neu
+      // -------------------------------------------------------
+      function toggleAdminNeu() {
+        const pin = document.getElementById("adminPinInput").value;
+        if (pin === "3141") {
+          isAdminNeu = true;
+          document.getElementById("saveButton").style.display = "inline-block";
+        } else {
+          alert("Falscher PIN");
+        }
+        renderTeamListNeu();
+        renderSidebarTeamListNeu();
+        renderDefaultViewNeu();
+      }
+
+      function renderTeamListNeu() {
+        const teamListDiv = document.getElementById("teamList");
+        if (isAdminNeu) {
+          teamListDiv.classList.remove("hidden");
+          let sDiv = document.createElement("div");
+          sDiv.style.display = "inline-block";
+          sDiv.style.verticalAlign = "top";
+          sDiv.style.marginRight = "30px";
+          let vDiv = document.createElement("div");
+          vDiv.style.display = "inline-block";
+          vDiv.style.verticalAlign = "top";
+          sDiv.innerHTML = "<h2>Teams Gruppe S</h2>";
+          vDiv.innerHTML = "<h2>Teams Gruppe V</h2>";
+          for (const teamID in teamsNeu) {
+            let container = document.createElement("div");
+            container.style.marginBottom = "5px";
+            if (teamID.startsWith("S")) {
+              container.innerHTML = `<label style="margin-right:10px;">${teamID}:</label>
+                <input type="text" value="${teamsNeu[teamID]}" onchange="teamsNeu['${teamID}'] = this.value; saveTeamsMappingToFirebaseNeu(); renderTeamListNeu(); renderSidebarTeamListNeu(); renderDefaultViewNeu();" />`;
+              sDiv.appendChild(container);
+            } else if (teamID.startsWith("V")) {
+              container.innerHTML = `<label style="margin-right:10px;">${teamID}:</label>
+                <input type="text" value="${teamsNeu[teamID]}" onchange="teamsNeu['${teamID}'] = this.value; saveTeamsMappingToFirebaseNeu(); renderTeamListNeu(); renderSidebarTeamListNeu(); renderDefaultViewNeu();" />`;
+              vDiv.appendChild(container);
+            }
+          }
+          teamListDiv.innerHTML = "";
+          teamListDiv.appendChild(sDiv);
+          teamListDiv.appendChild(vDiv);
+        } else {
+          teamListDiv.classList.add("hidden");
+        }
+      }
+
+      // -------------------------------------------------------
+      // Sidebar-Funktionen (neu)
+      // -------------------------------------------------------
+      function toggleSidebarNeu() {
+        const sidebar = document.getElementById("sidebar");
+        sidebar.classList.toggle("open");
+        const hamburgerIcon = document.getElementById("hamburgerIcon");
+        hamburgerIcon.style.display = sidebar.classList.contains("open") ? "none" : "block";
+      }
+
+      function renderSidebarTeamListNeu() {
+        const sidebarUl = document.getElementById("sidebarList");
+        sidebarUl.innerHTML = "";
+        for (const teamID in teamsNeu) {
+          if (teamID.startsWith("S") || teamID.startsWith("V")) {
+            let li = document.createElement("li");
+            li.textContent = teamsNeu[teamID];
+            li.style.cursor = "pointer";
+            li.onclick = function() {
+              let lis = sidebarUl.getElementsByTagName("li");
+              for (let item of lis) { item.classList.remove("highlight"); }
+              li.classList.add("highlight");
+              renderTeamScheduleNeu(teamID);
+            };
+            sidebarUl.appendChild(li);
+          }
+        }
+      }
+
+      function clearFilterNeu() {
+        const sidebarUl = document.getElementById("sidebarList");
+        let lis = sidebarUl.getElementsByTagName("li");
+        for (let item of lis) { item.classList.remove("highlight"); }
+        document.getElementById("navigationControls").style.display = "block";
+        renderDefaultViewNeu();
+      }
+
+      // -------------------------------------------------------
+      // Standardansicht: Standings und Spieltagsansicht (neu)
+      // -------------------------------------------------------
+      function renderDefaultViewNeu() {
+        renderStandingsNeu();
+        renderSpieltagNeu();
+      }
+
+      // Berechne die Gruppenstatistiken für Gruppe S bzw. V
+      function computeGroupStatsNeu(prefix) {
+        let stats = {};
+        for (const teamID in teamsNeu) {
+          if (teamID.startsWith(prefix)) {
+            stats[teamID] = { games: 0, wins: 0, gf: 0, ga: 0 };
+          }
+        }
+        // Für Gruppe S (früher A) nehmen wir Spieltage 1 und 3,
+        // für Gruppe V (früher B) Spieltage 2 und 4.
+        let relevantIndices = (prefix === "S") ? [0, 2] : [1, 3];
+        relevantIndices.forEach(idx => {
+          if (spieltageNeu[idx] && spieltageNeu[idx].spiele) {
+            spieltageNeu[idx].spiele.forEach(match => {
+              let gA = parseInt(match.goalsA, 10);
+              let gB = parseInt(match.goalsB, 10);
+              if (!isNaN(gA) && !isNaN(gB)) {
+                if (match.teamA.startsWith(prefix)) {
+                  stats[match.teamA].games++;
+                  stats[match.teamA].gf += gA;
+                  stats[match.teamA].ga += gB;
+                  if (gA > gB) stats[match.teamA].wins++;
+                }
+                if (match.teamB.startsWith(prefix)) {
+                  stats[match.teamB].games++;
+                  stats[match.teamB].gf += gB;
+                  stats[match.teamB].ga += gA;
+                  if (gB > gA) stats[match.teamB].wins++;
+                }
+              }
+            });
+          }
+        });
+        let sorted = Object.entries(stats).sort((a, b) => {
+          if (b[1].wins !== a[1].wins) return b[1].wins - a[1].wins;
+          return (b[1].gf - b[1].ga) - (a[1].gf - a[1].ga);
+        });
+        return sorted;
+      }
+
+      function createStandingsTableNeu(sortedStats, groupLabel) {
+        let table = document.createElement("table");
+        let caption = document.createElement("caption");
+        caption.textContent = groupLabel;
+        table.appendChild(caption);
+        let thead = document.createElement("thead");
+        thead.innerHTML = `
+          <tr>
+            <th>Team</th>
+            <th>Spiele</th>
+            <th>Siege</th>
+            <th>Punkte (GF : GA)</th>
+          </tr>
+        `;
+        table.appendChild(thead);
+        let tbody = document.createElement("tbody");
+        sortedStats.forEach(([teamID, stat]) => {
+          let row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${teamsNeu[teamID]}</td>
+            <td>${stat.games}</td>
+            <td>${stat.wins}</td>
+            <td>${stat.gf} : ${stat.ga}</td>
+          `;
+          tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        return table;
+      }
+
+      function renderStandingsNeu() {
+        const container = document.getElementById("standingsContainer");
+        container.innerHTML = "";
+        let standingsS = computeGroupStatsNeu("S");
+        let standingsV = computeGroupStatsNeu("V");
+        let tableS = createStandingsTableNeu(standingsS, "Gruppe S");
+        let tableV = createStandingsTableNeu(standingsV, "Gruppe V");
+        const wrapper = document.createElement("div");
+        wrapper.className = "group-tables";
+        wrapper.appendChild(tableS);
+        wrapper.appendChild(tableV);
+        container.appendChild(wrapper);
+      }
+
+      // -------------------------------------------------------
+      // Spieltagsansicht: Zeigt den aktuellen Spieltag (neu)
+      // -------------------------------------------------------
+      function renderSpieltagNeu() {
+        const container = document.getElementById("spieltagContainer");
+        container.innerHTML = "";
+        const currentDay = spieltageNeu[aktuellerSpieltagNeu].nummer;
+        document.getElementById("spieltagLabel").textContent = "Spieltag " + currentDay;
+        let table = document.createElement("table");
+        let caption = document.createElement("caption");
+        caption.textContent = "Spieltag " + currentDay;
+        table.appendChild(caption);
+        let thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>Feld</th><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th><th>Schiedsrichter</th></tr>";
+        table.appendChild(thead);
+        let tbody = document.createElement("tbody");
+        const fixtures = spieltageNeu[aktuellerSpieltagNeu].spiele || [];
+        fixtures.forEach((match, index) => {
+          let row = document.createElement("tr");
+          let feldCell = "";
+          if (isAdminNeu) {
+            feldCell = `<select onchange="updateGameNeu(${aktuellerSpieltagNeu}, ${index}, 'feld', this.value)">
+                          <option value="Feld 1" ${match.feld === "Feld 1" ? "selected" : ""}>Feld 1</option>
+                          <option value="Feld 2" ${match.feld === "Feld 2" ? "selected" : ""}>Feld 2</option>
+                        </select>`;
+          } else {
+            feldCell = match.feld || "Feld 1";
+          }
+          let teamAName = teamsNeu[match.teamA] || match.teamA;
+          let teamBName = teamsNeu[match.teamB] || match.teamB;
+          let ergebnis = "-";
+          if (isAdminNeu) {
+            ergebnis = `<div class="result-input">
+                          <input type="number" min="0" value="${match.goalsA}" onchange="updateGameNeu(${aktuellerSpieltagNeu}, ${index}, 'goalsA', this.value)" />
+                          <span>:</span>
+                          <input type="number" min="0" value="${match.goalsB}" onchange="updateGameNeu(${aktuellerSpieltagNeu}, ${index}, 'goalsB', this.value)" />
+                        </div>`;
+          } else if (match.goalsA !== "" && match.goalsB !== "") {
+            ergebnis = match.goalsA + " : " + match.goalsB;
+          }
+          let schiedsrichterCell = "";
+          if (isAdminNeu) {
+            let options = "<option value=''>-- wählen --</option>";
+            for (const key in teamsNeu) {
+              if (key.startsWith("S") || key.startsWith("V")) {
+                let selected = (match.schiedsrichter === key) ? "selected" : "";
+                options += `<option value="${key}" ${selected}>${teamsNeu[key]}</option>`;
+              }
+            }
+            schiedsrichterCell = `<select onchange="updateGameNeu(${aktuellerSpieltagNeu}, ${index}, 'schiedsrichter', this.value)">
+                                    ${options}
+                                  </select>`;
+          } else {
+            schiedsrichterCell = match.schiedsrichter ? teamsNeu[match.schiedsrichter] : "";
+          }
+          row.innerHTML = `
+            <td>${feldCell}</td>
+            <td>${match.zeit}</td>
+            <td>${teamAName}</td>
+            <td>${teamBName}</td>
+            <td>${ergebnis}</td>
+            <td>${schiedsrichterCell}</td>
+          `;
+          tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+      }
+
+      // Aktualisiert ein Feld in einem Spiel (neu)
+      function updateGameNeu(spieltagIndex, spielIndex, field, value) {
+        console.log("updateGameNeu:", field, value, "Spieltag", spieltageNeu[spieltagIndex].nummer, "Spiel", spielIndex);
+        if (spieltageNeu[spieltagIndex].spiele) {
+          spieltageNeu[spieltagIndex].spiele[spielIndex][field] = value;
+        }
+      }
+
+      function vorherigerSpieltagNeu() {
+        if (aktuellerSpieltagNeu > 0) {
+          aktuellerSpieltagNeu--;
+          renderSpieltagNeu();
+        }
+      }
+
+      function naechsterSpieltagNeu() {
+        if (aktuellerSpieltagNeu < spieltageNeu.length - 1) {
+          aktuellerSpieltagNeu++;
+          renderSpieltagNeu();
+        }
+      }
+
+      // -------------------------------------------------------
+      // Zeigt alle Spiele eines ausgewählten Teams (Filteransicht, neu)
+      // -------------------------------------------------------
+      function renderTeamScheduleNeu(teamID) {
+        document.getElementById("navigationControls").style.display = "none";
+        const standingsContainer = document.getElementById("standingsContainer");
+        let cells = standingsContainer.getElementsByTagName("td");
+        for (let cell of cells) {
+          if (cell.innerText === teamsNeu[teamID]) {
+            cell.style.backgroundColor = "orange";
+          } else {
+            cell.style.backgroundColor = "";
+          }
+        }
+        const container = document.getElementById("spieltagContainer");
+        container.innerHTML = "";
+        let header = document.createElement("h2");
+        header.textContent = "Spiele von " + teamsNeu[teamID];
+        container.appendChild(header);
+        let matches = [];
+        spieltageNeu.forEach(tag => {
+          if (tag.spiele) {
+            tag.spiele.forEach(match => {
+              if (match.teamA === teamID || match.teamB === teamID) {
+                matches.push({
+                  spieltag: tag.nummer,
+                  zeit: match.zeit,
+                  teamA: match.teamA,
+                  teamB: match.teamB,
+                  goalsA: match.goalsA,
+                  goalsB: match.goalsB,
+                  feld: match.feld,
+                  schiedsrichter: match.schiedsrichter
+                });
+              }
+            });
+          }
+        });
+        if (matches.length === 0) {
+          let p = document.createElement("p");
+          p.textContent = "Keine Spiele gefunden.";
+          container.appendChild(p);
+          return;
+        }
+        let table = document.createElement("table");
+        let thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>Spieltag</th><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th><th>Feld</th><th>Schiedsrichter</th></tr>";
+        table.appendChild(thead);
+        let tbody = document.createElement("tbody");
+        matches.forEach(m => {
+          let erg = "-";
+          if (m.goalsA !== "" && m.goalsB !== "") {
+            erg = m.goalsA + " : " + m.goalsB;
+          }
+          let row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${m.spieltag}</td>
+            <td>${m.zeit}</td>
+            <td>${teamsNeu[m.teamA] || m.teamA}</td>
+            <td>${teamsNeu[m.teamB] || m.teamB}</td>
+            <td>${erg}</td>
+            <td>${m.feld || "Feld 1"}</td>
+            <td>${m.schiedsrichter ? teamsNeu[m.schiedsrichter] : ""}</td>
+          `;
+          tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+      }
+
+      // -------------------------------------------------------
+      // Speichert alle Spieltage in einem neuen Firebase-Dokument
+      // -------------------------------------------------------
+      function saveAllSpieltagErgebnisseNeu() {
+        db.collection("metadata").doc("spieltage_neu").set({ spieltageNeu: spieltageNeu })
+          .then(() => {
+            alert("Alle Spieltage (neu) gespeichert!");
+            renderStandingsNeu();
+          })
+          .catch(error => {
+            console.error("Fehler beim Speichern der Spieltage (neu):", error);
+          });
+      }
+
+      // -------------------------------------------------------
+      // Lädt alle Spieltage aus dem neuen Firebase-Dokument
+      // -------------------------------------------------------
+      function ladeSpieltageNeu() {
+        db.collection("metadata").doc("spieltage_neu").get()
+          .then(doc => {
+            if (doc.exists) {
+              const data = doc.data();
+              if(data.spieltageNeu) {
+                spieltageNeu.splice(0, spieltageNeu.length, ...data.spieltageNeu);
+              }
+            }
+            renderStandingsNeu();
+            renderSpieltagNeu();
+          })
+          .catch(error => {
+            console.error("Fehler beim Laden der neuen Spieltage:", error);
+            renderStandingsNeu();
+            renderSpieltagNeu();
+          });
+      }
+
+      // -------------------------------------------------------
+      // Lädt die Teams aus dem neuen Firebase-Dokument
+      // -------------------------------------------------------
+      function ladeTeamDatenNeu() {
+        db.collection("metadata").doc("teams_neu").get()
+          .then(doc => {
+            if (doc.exists) {
+              teamsNeu = doc.data().teamsNeu || {};
+            }
+            if (Object.keys(teamsNeu).length === 0 ||
+                !Object.keys(teamsNeu).some(key => key.startsWith("S") || key.startsWith("V"))) {
+              teamsNeu = generiereStandardTeamsNeu();
+              saveTeamsMappingToFirebaseNeu();
+            }
+            renderTeamListNeu();
+            renderSidebarTeamListNeu();
+            renderDefaultViewNeu();
+            ladeSpieltageNeu(); // Nach Laden der Teams auch die Spieltage laden.
+          })
+          .catch(error => {
+            console.error("Fehler beim Laden der neuen Teams:", error);
+            teamsNeu = generiereStandardTeamsNeu();
+            renderTeamListNeu();
+            renderSidebarTeamListNeu();
+            renderDefaultViewNeu();
+            ladeSpieltageNeu();
+          });
+      }
+
+      // -----------------------------------------------
+      // Initialisierung der neuen Daten
+      // -----------------------------------------------
+      ladeTeamDatenNeu();
+    </script>
+  </body>
+</html>
