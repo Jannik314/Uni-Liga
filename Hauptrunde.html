@@ -26,87 +26,47 @@
         background-color: #003366;
         color: white;
       }
-      .highlight {
-        background-color: orange;
-      }
-      .result-input input {
-        width: 40px;
-        text-align: center;
-      }
-      .hidden {
-        display: none;
-      }
-      #teamList input {
-        margin: 2px;
-        padding: 5px 10px;
-      }
+      .highlight { background-color: orange; }
+      .result-input input { width: 40px; text-align: center; }
+      .hidden { display: none; }
+      #teamList input { margin: 2px; padding: 5px 10px; }
       /* Header & Navigation Styles */
       #header {
         display: flex;
         align-items: center;
-        justify-content: center; /* Zentriert den gesamten inneren Bereich */
+        justify-content: center;
         gap: 20px;
       }
-      #logo {
-        display: inline-block;
-        vertical-align: middle;
-      }
-      #logo img {
-        max-width: 200px; /* Logo ist etwas größer */
-        height: auto;
-      }
-      #header button {
-        padding: 12px 24px;
-        font-size: 1.2rem;
-        cursor: pointer;
-      }
+      #logo { display: inline-block; vertical-align: middle; }
+      #logo img { max-width: 200px; height: auto; }
+      #header button { padding: 12px 24px; font-size: 1.2rem; cursor: pointer; }
       /* Hamburger-Menü und Sidebar */
       #hamburgerIcon {
-        position: fixed;
-        top: 10px;
-        left: 20px;
-        font-size: 30px;
-        cursor: pointer;
-        z-index: 999;
+        position: fixed; top: 10px; left: 20px;
+        font-size: 30px; cursor: pointer; z-index: 999;
       }
       #sidebar {
-        position: fixed;
-        top: 0;
-        left: -250px;
-        width: 250px;
-        height: 100%;
+        position: fixed; top: 0; left: -250px;
+        width: 250px; height: 100%;
         background-color: #fff;
         box-shadow: 2px 0 5px rgba(0,0,0,0.3);
-        padding: 10px;
-        transition: left 0.3s ease;
-        z-index: 1001;
+        padding: 10px; transition: left 0.3s ease; z-index: 1001;
       }
-      #sidebar.open {
-        left: 0;
-      }
-      #sidebar h2 {
-        margin-top: 0;
-      }
-      #sidebar ul {
-        list-style: none;
-        padding: 0;
-      }
+      #sidebar.open { left: 0; }
+      #sidebar h2 { margin-top: 0; }
+      #sidebar ul { list-style: none; padding: 0; }
       #sidebar li {
-        padding: 8px;
-        cursor: pointer;
-        border-bottom: 1px solid #ccc;
+        padding: 8px; cursor: pointer; border-bottom: 1px solid #ccc;
       }
-      #sidebar li:hover {
-        background-color: #f0f0f0;
-      }
+      #sidebar li:hover { background-color: #f0f0f0; }
       /* Container für zwei Tabellen nebeneinander (Standings) */
       .group-tables {
-        display: flex;
-        justify-content: space-between;
-        gap: 1rem;
+        display: flex; justify-content: space-between; gap: 1rem;
       }
       /* Navigation (Spieltage) */
-      #navigationControls {
+      #navigationControls { text-align: center; margin-bottom: 1rem; }
+      /* Neue Linkliste für Spieltage */
+      #matchdayLinks {
         text-align: center;
         margin-bottom: 1rem;
       }
@@ -114,53 +74,53 @@
   </head>
   <body>
     <!-- Hamburger-Menü Icon -->
-    <div id="hamburgerIcon" onclick="toggleSidebarNeu()">&#9776;</div>
+    <div id="hamburgerIcon" onclick="xToggleSidebar()">&#9776;</div>
     <!-- Sidebar -->
     <div id="sidebar">
-      <span id="closeSidebar" onclick="toggleSidebarNeu()" style="cursor:pointer; float:right; font-size:30px;">&times;</span>
+      <span id="closeSidebar" onclick="xToggleSidebar()" style="cursor:pointer; float:right; font-size:30px;">&times;</span>
       <h2>Teams</h2>
       <ul id="sidebarList"></ul>
-      <button id="clearFilterButtonSidebar" onclick="clearFilterNeu()">Filter zurücksetzen</button>
+      <button id="clearFilterButtonSidebar" onclick="xClearFilter()">Filter zurücksetzen</button>
     </div>
-    <!-- Header: Logo in der Mitte, Navigations-Buttons daneben -->
+    <!-- Header: Logo und Navigation -->
     <div id="header">
       <div id="logo">
         <img src="Image.png" alt="Campusliga Logo" />
       </div>
-      <!-- Navigations-Buttons -->
       <div id="navigationButtons">
         <button onclick="location.href='volleyball.html'">Vorrunde</button>
         <button onclick="location.href='Hauptrunde.html'">Hauptrunde</button>
         <button onclick="location.href='Playoffs.html'">Playoffs</button>
       </div>
     </div>
-    <!-- Versteckter Titel (optional) -->
+    <!-- Versteckter Titel -->
     <h1 style="display:none;">Ligaplaner – Turnier (Neu)</h1>
     <!-- Adminbereich: Teams bearbeiten -->
     <div id="teamList" class="hidden"></div>
-    <!-- Standings: Zwei Tabellen (Gruppe S und Gruppe V) -->
+    <!-- Standings -->
     <div id="standingsContainer"></div>
-    <!-- Navigation für die Spieltagsansicht -->
+    <!-- Neue Linkliste für Spieltage -->
+    <div id="matchdayLinks"></div>
+    <!-- Navigation für Spieltagsansicht -->
     <div id="navigationControls">
-      <button onclick="vorherigerSpieltagNeu()">⬅️</button>
+      <button onclick="xVorherigerSpieltag()">⬅️</button>
       <span id="spieltagLabel">Spieltag 1</span>
-      <button onclick="naechsterSpieltagNeu()">➡️</button>
+      <button onclick="xNaechsterSpieltag()">➡️</button>
     </div>
     <!-- Spieltagsansicht -->
     <div id="spieltagContainer"></div>
     <!-- Admin: PIN-Eingabe und Speichern -->
     <div style="margin-top:2rem; text-align:center;">
       <input type="password" id="adminPinInput" placeholder="Admin PIN" />
-      <button onclick="toggleAdminNeu()">Anmelden</button>
-      <button id="saveButton" onclick="saveAllSpieltagErgebnisseNeu()" style="display:none;">Speichern</button>
+      <button onclick="xToggleAdmin()">Anmelden</button>
+      <button id="saveButton" onclick="xSaveAllMatchdays()" style="display:none;">Speichern</button>
     </div>
-
     <!-- Firebase Scripts -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script>
-      // Firebase-Konfiguration – passe hier deine Werte an!
-      const firebaseConfig = {
+      // Firebase-Konfiguration (unverändert, aber mit ungewöhnlichem Prefix in den Variablen)
+      const xFirebaseConfig = {
         apiKey: "AIzaSyAsneYTXmT7JDUewiJ09LUg1QSZK6Rj_8",
         authDomain: "uni-liga.firebaseapp.com",
         projectId: "uni-liga",
@@ -168,28 +128,26 @@
         messagingSenderId: "196698710621",
         appId: "1:196698710621:web:66d13babfc997bab5a3b4"
       };
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.firestore();
+      firebase.initializeApp(xFirebaseConfig);
+      const xDb = firebase.firestore();
 
-      // -----------------------------------------------
-      // Globale Variablen (neu)
-      // -----------------------------------------------
-      let isAdminNeu = false;
-      let aktuellerSpieltagNeu = 0;
-      let teamsNeu = {};
+      // Ungewöhnliche globale Variablen
+      let xAdminMode = false;
+      let xCurrentMatchdayIndex = 0;
+      let xTeamMapping = {};
 
-      // Standardteams: Gruppe S (ehemals A) und Gruppe V (ehemals B)
-      function generiereStandardTeamsNeu() {
-        let std = {};
+      // Generiere Standardteams für die Hauptrunde (Gruppe S und V)
+      function xGenerateStandardTeams() {
+        let tmp = {};
         for (let i = 1; i <= 8; i++) {
-          std["S" + i] = "Team S" + i;
-          std["V" + i] = "Team V" + i;
+          tmp["S" + i] = "Team S" + i;
+          tmp["V" + i] = "Team V" + i;
         }
-        return std;
+        return tmp;
       }
 
-      // Spieltage – angepasst an die neuen Team-IDs
-      const spieltageNeu = [
+      // Spieltage-Array (jedes Objekt enthält ein neues Datum-Feld)
+      const xMatchdays = [
         {
           nummer: 1,
           datum: "",
@@ -272,34 +230,41 @@
         }
       ];
 
-      // -------------------------------------------------------
-      // Speichert die neuen Teams in einem separaten Dokument in Firebase
-      // -------------------------------------------------------
-      function saveTeamsMappingToFirebaseNeu() {
-        db.collection("metadata").doc("teams_neu").set({ teamsNeu: teamsNeu })
-          .then(() => console.log("Neue Teams-Daten wurden gespeichert!"))
-          .catch(error => console.error("Fehler beim Speichern der neuen Teams:", error));
+      // Speichert das Team-Mapping in Firebase (Dokument: "x_team_mapping")
+      function xSaveXTeamMapping() {
+        xDb.collection("x_metadata").doc("x_team_mapping").set({ xTeamMapping: xTeamMapping })
+          .then(() => console.log("X Team Mapping gespeichert"))
+          .catch(error => console.error("Fehler beim Speichern des X Team Mappings:", error));
       }
 
-      // -------------------------------------------------------
-      // Adminmodus – Freischaltung mit PIN, neu
-      // -------------------------------------------------------
-      function toggleAdminNeu() {
+      // Speichert alle Spieltage in Firebase (Dokument: "x_matchdays")
+      function xSaveAllMatchdays() {
+        xDb.collection("x_metadata").doc("x_matchdays").set({ xMatchdays: xMatchdays })
+          .then(() => {
+            alert("Alle Spieltage gespeichert!");
+            xRenderStandings();
+          })
+          .catch(error => console.error("Fehler beim Speichern der Spieltage:", error));
+      }
+
+      // Adminmodus – aktiviert bei richtiger PIN
+      function xToggleAdmin() {
         const pin = document.getElementById("adminPinInput").value;
         if (pin === "3141") {
-          isAdminNeu = true;
+          xAdminMode = true;
           document.getElementById("saveButton").style.display = "inline-block";
         } else {
           alert("Falscher PIN");
         }
-        renderTeamListNeu();
-        renderSidebarTeamListNeu();
-        renderDefaultViewNeu();
+        xRenderTeamList();
+        xRenderSidebarTeamList();
+        xRenderDefaultView();
+        xRenderMatchdayLinks();
       }
 
-      function renderTeamListNeu() {
+      function xRenderTeamList() {
         const teamListDiv = document.getElementById("teamList");
-        if (isAdminNeu) {
+        if (xAdminMode) {
           teamListDiv.classList.remove("hidden");
           let sDiv = document.createElement("div");
           sDiv.style.display = "inline-block";
@@ -310,16 +275,16 @@
           vDiv.style.verticalAlign = "top";
           sDiv.innerHTML = "<h2>Teams Gruppe S</h2>";
           vDiv.innerHTML = "<h2>Teams Gruppe V</h2>";
-          for (const teamID in teamsNeu) {
+          for (const teamID in xTeamMapping) {
             let container = document.createElement("div");
             container.style.marginBottom = "5px";
             if (teamID.startsWith("S")) {
               container.innerHTML = `<label style="margin-right:10px;">${teamID}:</label>
-                <input type="text" value="${teamsNeu[teamID]}" onchange="teamsNeu['${teamID}'] = this.value; saveTeamsMappingToFirebaseNeu(); renderTeamListNeu(); renderSidebarTeamListNeu(); renderDefaultViewNeu();" />`;
+                <input type="text" value="${xTeamMapping[teamID]}" onchange="xTeamMapping['${teamID}'] = this.value; xSaveXTeamMapping(); xRenderTeamList(); xRenderSidebarTeamList(); xRenderDefaultView();" />`;
               sDiv.appendChild(container);
             } else if (teamID.startsWith("V")) {
               container.innerHTML = `<label style="margin-right:10px;">${teamID}:</label>
-                <input type="text" value="${teamsNeu[teamID]}" onchange="teamsNeu['${teamID}'] = this.value; saveTeamsMappingToFirebaseNeu(); renderTeamListNeu(); renderSidebarTeamListNeu(); renderDefaultViewNeu();" />`;
+                <input type="text" value="${xTeamMapping[teamID]}" onchange="xTeamMapping['${teamID}'] = this.value; xSaveXTeamMapping(); xRenderTeamList(); xRenderSidebarTeamList(); xRenderDefaultView();" />`;
               vDiv.appendChild(container);
             }
           }
@@ -331,65 +296,55 @@
         }
       }
 
-      // -------------------------------------------------------
-      // Sidebar-Funktionen (neu)
-      // -------------------------------------------------------
-      function toggleSidebarNeu() {
-        const sidebar = document.getElementById("sidebar");
-        sidebar.classList.toggle("open");
-        const hamburgerIcon = document.getElementById("hamburgerIcon");
-        hamburgerIcon.style.display = sidebar.classList.contains("open") ? "none" : "block";
-      }
-
-      function renderSidebarTeamListNeu() {
+      function xRenderSidebarTeamList() {
         const sidebarUl = document.getElementById("sidebarList");
         sidebarUl.innerHTML = "";
-        for (const teamID in teamsNeu) {
+        for (const teamID in xTeamMapping) {
           if (teamID.startsWith("S") || teamID.startsWith("V")) {
             let li = document.createElement("li");
-            li.textContent = teamsNeu[teamID];
+            li.textContent = xTeamMapping[teamID];
             li.style.cursor = "pointer";
             li.onclick = function() {
               let lis = sidebarUl.getElementsByTagName("li");
               for (let item of lis) { item.classList.remove("highlight"); }
               li.classList.add("highlight");
-              renderTeamScheduleNeu(teamID);
+              xRenderTeamSchedule(teamID);
             };
             sidebarUl.appendChild(li);
           }
         }
       }
 
-      function clearFilterNeu() {
-        const sidebarUl = document.getElementById("sidebarList");
-        let lis = sidebarUl.getElementsByTagName("li");
-        for (let item of lis) { item.classList.remove("highlight"); }
-        document.getElementById("navigationControls").style.display = "block";
-        renderDefaultViewNeu();
+      function xRenderDefaultView() {
+        xRenderStandings();
+        xRenderMatchday();
       }
 
-      // -------------------------------------------------------
-      // Standardansicht: Standings und Spieltagsansicht (neu)
-      // -------------------------------------------------------
-      function renderDefaultViewNeu() {
-        renderStandingsNeu();
-        renderSpieltagNeu();
+      function xRenderStandings() {
+        const container = document.getElementById("standingsContainer");
+        container.innerHTML = "";
+        let standingsS = xComputeGroupStats("S");
+        let standingsV = xComputeGroupStats("V");
+        let tableS = xCreateStandingsTable(standingsS, "Gruppe S");
+        let tableV = xCreateStandingsTable(standingsV, "Gruppe V");
+        const wrapper = document.createElement("div");
+        wrapper.className = "group-tables";
+        wrapper.appendChild(tableS);
+        wrapper.appendChild(tableV);
+        container.appendChild(wrapper);
       }
 
-      // Berechne die Gruppenstatistiken für Gruppe S bzw. V
-      function computeGroupStatsNeu(prefix) {
+      function xComputeGroupStats(prefix) {
         let stats = {};
-        for (const teamID in teamsNeu) {
+        for (const teamID in xTeamMapping) {
           if (teamID.startsWith(prefix)) {
             stats[teamID] = { games: 0, wins: 0, gf: 0, ga: 0 };
           }
         }
-        // Für Gruppe S (früher A) nehmen wir Spieltage 1 und 3,
-        // für Gruppe V (früher B) Spieltage 2 und 4.
         let relevantIndices = (prefix === "S") ? [0, 2] : [1, 3];
         relevantIndices.forEach(idx => {
-          if (spieltageNeu[idx] && spieltageNeu[idx].spiele) {
-            spieltageNeu[idx].spiele.forEach(match => {
+          if (xMatchdays[idx] && xMatchdays[idx].spiele) {
+            xMatchdays[idx].spiele.forEach(match => {
               let gA = parseInt(match.goalsA, 10);
               let gB = parseInt(match.goalsB, 10);
               if (!isNaN(gA) && !isNaN(gB)) {
@@ -416,7 +371,7 @@
         return sorted;
       }
 
-      function createStandingsTableNeu(sortedStats, groupLabel) {
+      function xCreateStandingsTable(sortedStats, groupLabel) {
         let table = document.createElement("table");
         let caption = document.createElement("caption");
         caption.textContent = groupLabel;
@@ -435,7 +390,7 @@
         sortedStats.forEach(([teamID, stat]) => {
           let row = document.createElement("tr");
           row.innerHTML = `
-            <td>${teamsNeu[teamID]}</td>
+            <td>${xTeamMapping[teamID]}</td>
             <td>${stat.games}</td>
             <td>${stat.wins}</td>
             <td>${stat.gf} : ${stat.ga}</td>
@@ -446,74 +401,90 @@
         return table;
       }
 
-      function renderStandingsNeu() {
-        const container = document.getElementById("standingsContainer");
-        container.innerHTML = "";
-        let standingsS = computeGroupStatsNeu("S");
-        let standingsV = computeGroupStatsNeu("V");
-        let tableS = createStandingsTableNeu(standingsS, "Gruppe S");
-        let tableV = createStandingsTableNeu(standingsV, "Gruppe V");
-        const wrapper = document.createElement("div");
-        wrapper.className = "group-tables";
-        wrapper.appendChild(tableS);
-        wrapper.appendChild(tableV);
-        container.appendChild(wrapper);
+      // Neue Funktion: Aktualisiert das Datum eines Spieltags
+      function xUpdateDatum(matchdayIndex, value) {
+        if (xMatchdays[matchdayIndex]) {
+          xMatchdays[matchdayIndex].datum = value;
+        }
       }
 
-      // -------------------------------------------------------
-      // Spieltagsansicht: Zeigt den aktuellen Spieltag (neu)
-      // -------------------------------------------------------
-      function renderSpieltagNeu() {
+      // Neue Linkliste: Rendert Links für jeden Spieltag
+      function xRenderMatchdayLinks() {
+        const linksDiv = document.getElementById("matchdayLinks");
+        linksDiv.innerHTML = "";
+        xMatchdays.forEach((md, index) => {
+          let link = document.createElement("a");
+          link.href = "javascript:void(0);";
+          link.textContent = "Spieltag " + md.nummer;
+          link.style.marginRight = "10px";
+          link.onclick = function() {
+            xCurrentMatchdayIndex = index;
+            document.getElementById("spieltagLabel").textContent = "Spieltag " + md.nummer;
+            xRenderMatchday();
+          };
+          linksDiv.appendChild(link);
+        });
+      }
+
+      function xRenderMatchday() {
         const container = document.getElementById("spieltagContainer");
         container.innerHTML = "";
-        const currentDay = spieltageNeu[aktuellerSpieltagNeu].nummer;
-        document.getElementById("spieltagLabel").textContent = "Spieltag " + currentDay;
+        let currentMD = xMatchdays[xCurrentMatchdayIndex];
+        // Datum anzeigen (bei Admin als Input, sonst als Text)
+        let datumDiv = document.createElement("div");
+        if (xAdminMode) {
+          datumDiv.innerHTML = 'Datum: <input type="date" value="'+currentMD.datum+'" onchange="xUpdateDatum('+xCurrentMatchdayIndex+', this.value)">';
+        } else {
+          datumDiv.innerHTML = 'Datum: ' + (currentMD.datum ? currentMD.datum : "-");
+        }
+        container.appendChild(datumDiv);
+        // Spieltagstabelle
         let table = document.createElement("table");
         let caption = document.createElement("caption");
-        caption.textContent = "Spieltag " + currentDay;
+        caption.textContent = "Spieltag " + currentMD.nummer;
         table.appendChild(caption);
         let thead = document.createElement("thead");
         thead.innerHTML = "<tr><th>Feld</th><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th><th>Schiedsrichter</th></tr>";
         table.appendChild(thead);
         let tbody = document.createElement("tbody");
-        const fixtures = spieltageNeu[aktuellerSpieltagNeu].spiele || [];
+        const fixtures = currentMD.spiele || [];
         fixtures.forEach((match, index) => {
           let row = document.createElement("tr");
           let feldCell = "";
-          if (isAdminNeu) {
-            feldCell = `<select onchange="updateGameNeu(${aktuellerSpieltagNeu}, ${index}, 'feld', this.value)">
-                          <option value="Feld 1" ${match.feld === "Feld 1" ? "selected" : ""}>Feld 1</option>
-                          <option value="Feld 2" ${match.feld === "Feld 2" ? "selected" : ""}>Feld 2</option>
-                        </select>`;
+          if (xAdminMode) {
+            feldCell = `<select onchange="xUpdateGame(${xCurrentMatchdayIndex}, ${index}, 'feld', this.value)">
+                           <option value="Feld 1" ${match.feld === "Feld 1" ? "selected" : ""}>Feld 1</option>
+                           <option value="Feld 2" ${match.feld === "Feld 2" ? "selected" : ""}>Feld 2</option>
+                         </select>`;
           } else {
             feldCell = match.feld || "Feld 1";
           }
-          let teamAName = teamsNeu[match.teamA] || match.teamA;
-          let teamBName = teamsNeu[match.teamB] || match.teamB;
+          let teamAName = xTeamMapping[match.teamA] || match.teamA;
+          let teamBName = xTeamMapping[match.teamB] || match.teamB;
           let ergebnis = "-";
-          if (isAdminNeu) {
+          if (xAdminMode) {
             ergebnis = `<div class="result-input">
-                          <input type="number" min="0" value="${match.goalsA}" onchange="updateGameNeu(${aktuellerSpieltagNeu}, ${index}, 'goalsA', this.value)" />
+                          <input type="number" min="0" value="${match.goalsA}" onchange="xUpdateGame(${xCurrentMatchdayIndex}, ${index}, 'goalsA', this.value)" />
                           <span>:</span>
-                          <input type="number" min="0" value="${match.goalsB}" onchange="updateGameNeu(${aktuellerSpieltagNeu}, ${index}, 'goalsB', this.value)" />
+                          <input type="number" min="0" value="${match.goalsB}" onchange="xUpdateGame(${xCurrentMatchdayIndex}, ${index}, 'goalsB', this.value)" />
                         </div>`;
           } else if (match.goalsA !== "" && match.goalsB !== "") {
             ergebnis = match.goalsA + " : " + match.goalsB;
           }
           let schiedsrichterCell = "";
-          if (isAdminNeu) {
+          if (xAdminMode) {
             let options = "<option value=''>-- wählen --</option>";
-            for (const key in teamsNeu) {
+            for (const key in xTeamMapping) {
               if (key.startsWith("S") || key.startsWith("V")) {
                 let selected = (match.schiedsrichter === key) ? "selected" : "";
-                options += `<option value="${key}" ${selected}>${teamsNeu[key]}</option>`;
+                options += `<option value="${key}" ${selected}>${xTeamMapping[key]}</option>`;
               }
             }
-            schiedsrichterCell = `<select onchange="updateGameNeu(${aktuellerSpieltagNeu}, ${index}, 'schiedsrichter', this.value)">
+            schiedsrichterCell = `<select onchange="xUpdateGame(${xCurrentMatchdayIndex}, ${index}, 'schiedsrichter', this.value)">
                                     ${options}
                                   </select>`;
           } else {
-            schiedsrichterCell = match.schiedsrichter ? teamsNeu[match.schiedsrichter] : "";
+            schiedsrichterCell = match.schiedsrichter ? xTeamMapping[match.schiedsrichter] : "";
           }
           row.innerHTML = `
             <td>${feldCell}</td>
@@ -529,37 +500,35 @@
         container.appendChild(table);
       }
 
-      // Aktualisiert ein Feld in einem Spiel (neu)
-      function updateGameNeu(spieltagIndex, spielIndex, field, value) {
-        console.log("updateGameNeu:", field, value, "Spieltag", spieltageNeu[spieltagIndex].nummer, "Spiel", spielIndex);
-        if (spieltageNeu[spieltagIndex].spiele) {
-          spieltageNeu[spieltagIndex].spiele[spielIndex][field] = value;
+      function xUpdateGame(matchdayIndex, matchIndex, field, value) {
+        console.log("xUpdateGame:", field, value, "Spieltag", xMatchdays[matchdayIndex].nummer, "Spiel", matchIndex);
+        if (xMatchdays[matchdayIndex].spiele) {
+          xMatchdays[matchdayIndex].spiele[matchIndex][field] = value;
         }
       }
 
-      function vorherigerSpieltagNeu() {
-        if (aktuellerSpieltagNeu > 0) {
-          aktuellerSpieltagNeu--;
-          renderSpieltagNeu();
+      function xVorherigerSpieltag() {
+        if (xCurrentMatchdayIndex > 0) {
+          xCurrentMatchdayIndex--;
+          document.getElementById("spieltagLabel").textContent = "Spieltag " + xMatchdays[xCurrentMatchdayIndex].nummer;
+          xRenderMatchday();
         }
       }
 
-      function naechsterSpieltagNeu() {
-        if (aktuellerSpieltagNeu < spieltageNeu.length - 1) {
-          aktuellerSpieltagNeu++;
-          renderSpieltagNeu();
+      function xNaechsterSpieltag() {
+        if (xCurrentMatchdayIndex < xMatchdays.length - 1) {
+          xCurrentMatchdayIndex++;
+          document.getElementById("spieltagLabel").textContent = "Spieltag " + xMatchdays[xCurrentMatchdayIndex].nummer;
+          xRenderMatchday();
         }
       }
 
-      // -------------------------------------------------------
-      // Zeigt alle Spiele eines ausgewählten Teams (Filteransicht, neu)
-      // -------------------------------------------------------
-      function renderTeamScheduleNeu(teamID) {
+      function xRenderTeamSchedule(teamID) {
         document.getElementById("navigationControls").style.display = "none";
         const standingsContainer = document.getElementById("standingsContainer");
         let cells = standingsContainer.getElementsByTagName("td");
         for (let cell of cells) {
-          if (cell.innerText === teamsNeu[teamID]) {
+          if (cell.innerText === xTeamMapping[teamID]) {
             cell.style.backgroundColor = "orange";
           } else {
             cell.style.backgroundColor = "";
@@ -568,10 +537,10 @@
         const container = document.getElementById("spieltagContainer");
         container.innerHTML = "";
         let header = document.createElement("h2");
-        header.textContent = "Spiele von " + teamsNeu[teamID];
+        header.textContent = "Spiele von " + xTeamMapping[teamID];
         container.appendChild(header);
         let matches = [];
-        spieltageNeu.forEach(tag => {
+        xMatchdays.forEach(tag => {
           if (tag.spiele) {
             tag.spiele.forEach(match => {
               if (match.teamA === teamID || match.teamB === teamID) {
@@ -609,11 +578,11 @@
           row.innerHTML = `
             <td>${m.spieltag}</td>
             <td>${m.zeit}</td>
-            <td>${teamsNeu[m.teamA] || m.teamA}</td>
-            <td>${teamsNeu[m.teamB] || m.teamB}</td>
+            <td>${xTeamMapping[m.teamA] || m.teamA}</td>
+            <td>${xTeamMapping[m.teamB] || m.teamB}</td>
             <td>${erg}</td>
             <td>${m.feld || "Feld 1"}</td>
-            <td>${m.schiedsrichter ? teamsNeu[m.schiedsrichter] : ""}</td>
+            <td>${m.schiedsrichter ? xTeamMapping[m.schiedsrichter] : ""}</td>
           `;
           tbody.appendChild(row);
         });
@@ -621,75 +590,30 @@
         container.appendChild(table);
       }
 
-      // -------------------------------------------------------
-      // Speichert alle Spieltage in einem neuen Firebase-Dokument
-      // -------------------------------------------------------
-      function saveAllSpieltagErgebnisseNeu() {
-        db.collection("metadata").doc("spieltage_neu").set({ spieltageNeu: spieltageNeu })
-          .then(() => {
-            alert("Alle Spieltage (neu) gespeichert!");
-            renderStandingsNeu();
-          })
-          .catch(error => {
-            console.error("Fehler beim Speichern der Spieltage (neu):", error);
-          });
+      // Initialisierung: Falls kein Mapping vorhanden, Standardteams generieren
+      if (Object.keys(xTeamMapping).length === 0) {
+        xTeamMapping = xGenerateStandardTeams();
+        xSaveXTeamMapping();
       }
-
-      // -------------------------------------------------------
-      // Lädt alle Spieltage aus dem neuen Firebase-Dokument
-      // -------------------------------------------------------
-      function ladeSpieltageNeu() {
-        db.collection("metadata").doc("spieltage_neu").get()
-          .then(doc => {
-            if (doc.exists) {
-              const data = doc.data();
-              if(data.spieltageNeu) {
-                spieltageNeu.splice(0, spieltageNeu.length, ...data.spieltageNeu);
-              }
-            }
-            renderStandingsNeu();
-            renderSpieltagNeu();
-          })
-          .catch(error => {
-            console.error("Fehler beim Laden der neuen Spieltage:", error);
-            renderStandingsNeu();
-            renderSpieltagNeu();
-          });
+      xRenderTeamList();
+      xRenderSidebarTeamList();
+      xRenderDefaultView();
+      xRenderMatchdayLinks();
+      
+      // Einfaches Sidebar-Toggle und Filter-Reset
+      function xToggleSidebar() {
+        const sidebar = document.getElementById("sidebar");
+        sidebar.classList.toggle("open");
+        const hamburgerIcon = document.getElementById("hamburgerIcon");
+        hamburgerIcon.style.display = sidebar.classList.contains("open") ? "none" : "block";
       }
-
-      // -------------------------------------------------------
-      // Lädt die Teams aus dem neuen Firebase-Dokument
-      // -------------------------------------------------------
-      function ladeTeamDatenNeu() {
-        db.collection("metadata").doc("teams_neu").get()
-          .then(doc => {
-            if (doc.exists) {
-              teamsNeu = doc.data().teamsNeu || {};
-            }
-            if (Object.keys(teamsNeu).length === 0 ||
-                !Object.keys(teamsNeu).some(key => key.startsWith("S") || key.startsWith("V"))) {
-              teamsNeu = generiereStandardTeamsNeu();
-              saveTeamsMappingToFirebaseNeu();
-            }
-            renderTeamListNeu();
-            renderSidebarTeamListNeu();
-            renderDefaultViewNeu();
-            ladeSpieltageNeu(); // Nach Laden der Teams auch die Spieltage laden.
-          })
-          .catch(error => {
-            console.error("Fehler beim Laden der neuen Teams:", error);
-            teamsNeu = generiereStandardTeamsNeu();
-            renderTeamListNeu();
-            renderSidebarTeamListNeu();
-            renderDefaultViewNeu();
-            ladeSpieltageNeu();
-          });
+      function xClearFilter() {
+        const sidebarUl = document.getElementById("sidebarList");
+        let lis = sidebarUl.getElementsByTagName("li");
+        for (let item of lis) { item.classList.remove("highlight"); }
+        document.getElementById("navigationControls").style.display = "block";
+        xRenderDefaultView();
       }
-
-      // -----------------------------------------------
-      // Initialisierung der neuen Daten
-      // -----------------------------------------------
-      ladeTeamDatenNeu();
     </script>
   </body>
 </html>
