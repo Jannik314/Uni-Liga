@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Turnierplan</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f4f6f9; }
+
+    /* SIDEBAR */
+    #sidebar {
+      position: fixed; top: 0; left: -250px;
+      width: 250px; height: 100%; background: #fff; padding: 10px;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+      transition: left .3s ease; z-index: 1000;
+    }
+    #sidebar.open { left: 0; }
+    #closeSidebar { float: right; font-size: 24px; cursor: pointer; }
+    #sidebar h2 { margin-top: 0; }
+    #sidebar ul { list-style: none; padding: 0; margin-top: 20px; }
+    #sidebar li { padding: 8px; cursor: pointer; border-bottom: 1px solid #ccc; }
+    #sidebar li.highlight { background: orange; color: #fff; }
+    #clearFilter {
+      margin-top: 10px; padding: 6px 12px; width: 100%;
+      border: 1px solid #ccc; background: #fff; border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* HAUPTBEREICH */
+    .wrapper { margin-left: 0; transition: margin-left .3s ease; }
+    .wrapper.shifted { margin-left: 250px; }
+
+    /* HEADER */
+    header {
+      display: flex; align-items: center; padding: 10px 20px;
+      background: transparent;
+    }
+    #hamburger {
+      font-size: 24px; background: none; border: none;
+      cursor: pointer; margin-right: 10px;
+    }
+    header img { height: 240px; }       /* Logo doppelt so groß */
+    .top-buttons { margin: 0 auto; }
+    .top-buttons a {
+      margin: 0 5px; padding: 8px 16px;
+      border: 1px solid #ccc; background: #fff;
+      text-decoration: none; color: #333; border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* SPIELTAG NAV */
+    .spieltag-nav {
+      display: flex; align-items: center; justify-content: center;
+      margin: 20px 0;
+    }
+    .spieltag-nav button {
+      font-size: 18px; padding: 6px 12px; margin: 0 20px;
+      border: 1px solid #ccc; background: #fff;
+      border-radius: 4px; cursor: pointer;
+    }
+    .spieltag-date {
+      margin: 0 10px; padding: 4px;
+      border: 1px solid #ccc; border-radius: 4px;
+      text-align: center;
+    }
+    /* Disabled-Datum im Nicht-Admin-Modus normal anzeigen */
+    .spieltag-date:disabled {
+      background: #fff !important;
+      color: #000 !important;
+      opacity: 1 !important;
+    }
+
+    /* Ergebnisfelder im Nicht-Admin-Modus normal anzeigen */
+    .result-input input:disabled {
+      background: #fff !important;
+      color: #000 !important;
+      opacity: 1 !important;
+    }
+
+    /* TEAM-EDITOR */
+    #teamEditor {
+      display: none; background: #fff; padding: 10px 20px;
+      margin: 20px; border: 1px solid #ccc; border-radius: 4px;
+    }
+    #teamEditor h3 { margin-top: 0; }
+    #teamEditor .edit-row { margin-bottom: 8px; }
+    #teamEditor label { display: inline-block; width: 50px; }
+    #teamEditor input {
+      width: 150px; padding: 4px;
+      border: 1px solid #ccc; border-radius: 4px;
+    }
+
+    /* GRUPPEN-TABELLEN */
+    .group-tables {
+      display: flex; justify-content: space-around;
+      padding: 20px; background: #f9f6f2;
+    }
+    .group-tables table {
+      width: 45%; border-collapse: collapse; background: #fff;
+    }
+    .group-tables th, .group-tables td {
+      border: 1px solid #ccc; padding: 6px; text-align: center;
+    }
+    .group-tables th { background: #003366; color: #fff; }
+
+    /* SPIELTAG-BLOCKS */
+    .spieltag-block { display: none; margin-bottom: 30px; }
+    .spieltag-info small {
+      display: none; margin-bottom: 4px; font-size: 0.9rem; color: #333;
+      text-align: left;
+    }
+    .spieltag-block table {
+      width: 100%; border-collapse: collapse; background: #fff;
+    }
+    .spieltag-block th, .spieltag-block td {
+      border: 1px solid #ccc; padding: 6px; text-align: center;
+    }
+    .spieltag-block th { background: #003366; color: #fff; }
+    .result-input {
+      display: flex; justify-content: center; align-items: center;
+    }
+    .result-input input {
+      width: 40px; text-align: center; margin: 0 2px;
+    }
+
+    /* ADMIN-PIN & SAVE */
+    .admin-pin {
+      margin: 20px auto; text-align: center;
+    }
+    .admin-pin input {
+      width: 60px; padding: 4px; margin-right: 4px;
+      border: 1px solid #ccc; border-radius: 4px;
+    }
+    .admin-pin button {
+      padding: 4px 8px; margin-right:4px;
+      border: 1px solid #ccc; background: #fff;
+      border-radius: 4px; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <span id="closeSidebar">&times;</span>
+    <h2>Teams</h2>
+    <ul id="sidebarList">
+      <li data-team="A1">Team A1</li><li data-team="A2">Team A2</li>
+      <li data-team="A3">Team A3</li><li data-team="A4">Team A4</li>
+      <li data-team="A5">Team A5</li><li data-team="A6">Team A6</li>
+      <li data-team="B1">Team B1</li><li data-team="B2">Team B2</li>
+      <li data-team="B3">Team B3</li><li data-team="B4">Team B4</li>
+      <li data-team="B5">Team B5</li><li data-team="B6">Team B6</li>
+    </ul>
+    <button id="clearFilter">Filter zurücksetzen</button>
+  </div>
+
+  <!-- HAUPTBEREICH -->
+  <div class="wrapper" id="main">
+
+    <!-- HEADER -->
+    <header>
+      <button id="hamburger">☰</button>
+      <img src="Image.png" alt="Logo">
+      <div class="top-buttons">
+        <a href="#">Vorrunde</a>
+        <a href="hauptrunde.html">Hauptrunde</a>
+        <a href="playoffs.html">Playoffs</a>
+      </div>
+    </header>
+
+    <!-- TEAM-EDITOR -->
+    <div id="teamEditor"><h3>Teamnamen bearbeiten</h3></div>
+
+    <!-- GRUPPENSTANDINGS -->
+    <div class="group-tables">
+      <table id="groupA">
+        <caption>Gruppe A</caption>
+        <thead>
+          <tr><th>Team</th><th>Spiele</th><th>Siege</th><th>Punkte</th></tr>
+        </thead>
+        <tbody>
+          <tr data-team="A1"><td>Team A1</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="A2"><td>Team A2</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="A3"><td>Team A3</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="A4"><td>Team A4</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="A5"><td>Team A5</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="A6"><td>Team A6</td><td>0</td><td>0</td><td>0:0</td></tr>
+        </tbody>
+      </table>
+      <table id="groupB">
+        <caption>Gruppe B</caption>
+        <thead>
+          <tr><th>Team</th><th>Spiele</th><th>Siege</th><th>Punkte</th></tr>
+        </thead>
+        <tbody>
+          <tr data-team="B1"><td>Team B1</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="B2"><td>Team B2</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="B3"><td>Team B3</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="B4"><td>Team B4</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="B5"><td>Team B5</td><td>0</td><td>0</td><td>0:0</td></tr>
+          <tr data-team="B6"><td>Team B6</td><td>0</td><td>0</td><td>0:0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SPIELTAG NAVIGATION -->
+    <div class="spieltag-nav">
+      <button id="prevDay">&larr;</button>
+      <input type="date" id="spielDatum" class="spieltag-date" disabled>
+      <span>Spieltag <span id="aktDay">1</span></span>
+      <button id="nextDay">&rarr;</button>
+    </div>
+
+    <!-- SPIELTAG-BLOCKS -->
+    <div class="spieltage">
+
+      <!-- Block 1 -->
+      <div id="block1" class="spieltag-block">
+        <div class="spieltag-info">
+          <small>Spieltag 1 – <span class="date-show"></span></small>
+        </div>
+        <table data-day="1">
+          <thead>
+            <tr><th>Feld</th><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th><th>Schiedsrichter</th></tr>
+          </thead>
+          <tbody>
+            <tr data-a="A1" data-b="A4" data-r="A3">
+              <td>Feld 1</td><td>16:15–16:30</td><td>Team A1</td><td>Team A4</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A3</td>
+            </tr>
+            <tr data-a="A2" data-b="A5" data-r="A1">
+              <td>Feld 1</td><td>16:35–16:50</td><td>Team A2</td><td>Team A5</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A1</td>
+            </tr>
+            <tr data-a="A3" data-b="A4" data-r="A2"> <!-- korrigiert -->
+              <td>Feld 1</td><td>16:55–17:10</td><td>Team A3</td><td>Team A4</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A2</td>
+            </tr>
+            <tr data-a="A1" data-b="A5" data-r="A4">
+              <td>Feld 1</td><td>17:15–17:30</td><td>Team A1</td><td>Team A5</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A4</td>
+            </tr>
+            <tr data-a="A2" data-b="A6" data-r="A5">
+              <td>Feld 1</td><td>17:35–17:50</td><td>Team A2</td><td>Team A6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A5</td>
+            </tr>
+            <tr data-a="A3" data-b="A1" data-r="A6">
+              <td>Feld 1</td><td>17:55–18:10</td><td>Team A3</td><td>Team A1</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A6</td>
+            </tr>
+            <tr data-a="A5" data-b="A6" data-r="A3">
+              <td>Feld 1</td><td>18:15–18:30</td><td>Team A5</td><td>Team A6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A3</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Block 2 -->
+      <div id="block2" class="spieltag-block">
+        <div class="spieltag-info">
+          <small>Spieltag 2 – <span class="date-show"></span></small>
+        </div>
+        <table data-day="2">
+          <thead>
+            <tr><th>Feld</th><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th><th>Schiedsrichter</th></tr>
+          </thead>
+          <tbody>
+            <tr data-a="B1" data-b="B4" data-r="B3">
+              <td>Feld 1</td><td>16:15–16:30</td><td>Team B1</td><td>Team B4</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B3</td>
+            </tr>
+            <tr data-a="B2" data-b="B5" data-r="B1">
+              <td>Feld 1</td><td>16:35–16:50</td><td>Team B2</td><td>Team B5</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B1</td>
+            </tr>
+            <tr data-a="B3" data-b="B4" data-r="B2">
+              <td>Feld 1</td><td>16:55–17:10</td><td>Team B3</td><td>Team B4</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B2</td>
+            </tr>
+            <tr data-a="B1" data-b="B5" data-r="B4">
+              <td>Feld 1</td><td>17:15–17:30</td><td>Team B1</td><td>Team B5</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B4</td>
+            </tr>
+            <tr data-a="B2" data-b="B6" data-r="B5">
+              <td>Feld 1</td><td>17:35–17:50</td><td>Team B2</td><td>Team B6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B5</td>
+            </tr>
+            <tr data-a="B3" data-b="B1" data-r="B6">
+              <td>Feld 1</td><td>17:55–18:10</td><td>Team B3</td><td>Team B1</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B6</td>
+            </tr>
+            <tr data-a="B5" data-b="B6" data-r="B3">
+              <td>Feld 1</td><td>18:15–18:30</td><td>Team B5</td><td>Team B6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B3</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Block 3 -->
+      <div id="block3" class="spieltag-block">
+        <div class="spieltag-info">
+          <small>Spieltag 3 – <span class="date-show"></span></small>
+        </div>
+        <table data-day="3">
+          <thead>
+            <tr><th>Feld</th><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th><th>Schiedsrichter</th></tr>
+          </thead>
+          <tbody>
+            <tr data-a="A4" data-b="A2" data-r="A6">
+              <td>Feld 1</td><td>16:15–16:30</td><td>Team A4</td><td>Team A2</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A6</td>
+            </tr>
+            <tr data-a="A3" data-b="A6" data-r="A2">
+              <td>Feld 1</td><td>16:35–16:50</td><td>Team A3</td><td>Team A6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A2</td>
+            </tr>
+            <tr data-a="A4" data-b="A5" data-r="A3">
+              <td>Feld 1</td><td>16:55–17:10</td><td>Team A4</td><td>Team A5</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A3</td>
+            </tr>
+            <tr data-a="A1" data-b="A6" data-r="A4">
+              <td>Feld 1</td><td>17:15–17:30</td><td>Team A1</td><td>Team A6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A4</td>
+            </tr>
+            <tr data-a="A3" data-b="A2" data-r="A1">
+              <td>Feld 1</td><td>17:35–17:50</td><td>Team A3</td><td>Team A2</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A1</td>
+            </tr>
+            <tr data-a="A4" data-b="A6" data-r="A5">
+              <td>Feld 1</td><td>17:55–18:10</td><td>Team A4</td><td>Team A6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A5</td>
+            </tr>
+            <tr data-a="A1" data-b="A2" data-r="A3">
+              <td>Feld 1</td><td>18:15–18:30</td><td>Team A1</td><td>Team A2</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A3</td>
+            </tr>
+            <tr data-a="A3" data-b="A5" data-r="A2">
+              <td>Feld 1</td><td>18:35–18:50</td><td>Team A3</td><td>Team A5</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team A2</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Block 4 -->
+      <div id="block4" class="spieltag-block">
+        <div class="spieltag-info">
+          <small>Spieltag 4 – <span class="date-show"></span></small>
+        </div>
+        <table data-day="4">
+          <thead>
+            <tr><th>Feld</th><th>Zeit</th><th>Team A</th><th>Team B</th><th>Ergebnis</th><th>Schiedsrichter</th></tr>
+          </thead>
+          <tbody>
+            <tr data-a="B4" data-b="B2" data-r="B6">
+              <td>Feld 1</td><td>16:15–16:30</td><td>Team B4</td><td>Team B2</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B6</td>
+            </tr>
+            <tr data-a="B3" data-b="B6" data-r="B2">
+              <td>Feld 1</td><td>16:35–16:50</td><td>Team B3</td><td>Team B6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B2</td>
+            </tr>
+            <tr data-a="B4" data-b="B5" data-r="B3">
+              <td>Feld 1</td><td>16:55–17:10</td><td>Team B4</td><td>Team B5</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B3</td>
+            </tr>
+            <tr data-a="B1" data-b="B6" data-r="B4">
+              <td>Feld 1</td><td>17:15–17:30</td><td>Team B1</td><td>Team B6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B4</td>
+            </tr>
+            <tr data-a="B3" data-b="B2" data-r="B1">
+              <td>Feld 1</td><td>17:35–17:50</td><td>Team B3</td><td>Team B2</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B1</td>
+            </tr>
+            <tr data-a="B4" data-b="B6" data-r="B5">
+              <td>Feld 1</td><td>17:55–18:10</td><td>Team B4</td><td>Team B6</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B5</td>
+            </tr>
+            <tr data-a="B1" data-b="B2" data-r="B3">
+              <td>Feld 1</td><td>18:15–18:30</td><td>Team B1</td><td>Team B2</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B3</td>
+            </tr>
+            <tr data-a="B3" data-b="B5" data-r="B2">
+              <td>Feld 1</td><td>18:35–18:50</td><td>Team B3</td><td>Team B5</td>
+              <td class="result-input">
+                <input type="number" min="0" disabled><span>:</span>
+                <input type="number" min="0" disabled>
+              </td>
+              <td>Team B2</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- ADMIN-PIN & SAVE -->
+    <div class="admin-pin">
+      <input type="password" id="pin-input" placeholder="PIN">
+      <button id="pinBtn">Anmelden</button>
+      <button id="manualSaveBtn" disabled>Speichern</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAsneYTXmTJ7JDUewiJO9Lug1QSZK6Rj_8",
+      authDomain: "uni-liga.firebaseapp.com",
+      projectId: "uni-liga",
+      storageBucket: "uni-liga.firebasestorage.app",
+      messagingSenderId: "196698710621",
+      appId: "1:196698710621:web:66d103abfbc997bab5a3b4",
+      measurementId: "G-MGRBCQPM62"
+    };
+    const app       = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db        = getFirestore(app);
+
+    const xenonTeams      = {
+      A1:'Team A1',A2:'Team A2',A3:'Team A3',
+      A4:'Team A4',A5:'Team A5',A6:'Team A6',
+      B1:'Team B1',B2:'Team B2',B3:'Team B3',
+      B4:'Team B4',B5:'Team B5',B6:'Team B6'
+    };
+    const chronosDates    = { '1':'','2':'','3':'','4':'' };
+    const nebulaMatchdays = { '1':[], '2':[], '3':[], '4':[] };
+
+    for (let d=1; d<=4; d++) {
+      document.querySelectorAll(`#block${d} tbody tr`).forEach(_=>{
+        nebulaMatchdays[d].push({ goalsA:'', goalsB:'' });
+      });
+    }
+
+    async function saveOmega(){
+      try {
+        await setDoc(doc(db,'cosmos','tourney'), {
+          xenonTeams, chronosDates, nebulaMatchdays
+        });
+        alert('Speichern erfolgreich!');
+      } catch(err){
+        alert('Fehler beim Speichern: '+err.message);
+      }
+    }
+
+    async function loadOmega(){
+      try {
+        const snap = await getDoc(doc(db,'cosmos','tourney'));
+        if(!snap.exists()) return;
+        const data = snap.data();
+        Object.assign(xenonTeams,      data.xenonTeams);
+        Object.assign(chronosDates,    data.chronosDates);
+        Object.assign(nebulaMatchdays, data.nebulaMatchdays);
+        updateAllNames();
+        for (let d=1; d<=4; d++){
+          if(d===currentDay) spielDatum.value = chronosDates[d]||'';
+          document.querySelector(`#block${d} .date-show`).textContent =
+            chronosDates[d]? new Date(chronosDates[d]).toLocaleDateString('de-DE') : '–';
+          document.querySelectorAll(`#block${d} tbody tr`).forEach((r,i)=>{
+            const [i1,i2] = r.querySelectorAll('input');
+            i1.value = nebulaMatchdays[d][i].goalsA;
+            i2.value = nebulaMatchdays[d][i].goalsB;
+          });
+        }
+        renderMatches();
+        updateGroupStats();
+      } catch(err){
+        console.error(err);
+      }
+    }
+
+    const spielDatum     = document.getElementById('spielDatum');
+    const manualSaveBtn  = document.getElementById('manualSaveBtn');
+    const pinBtn         = document.getElementById('pinBtn');
+    let adminOn          = false;
+    let currentDay       = 1;
+    let selectedTeam     = null;
+
+    document.getElementById('hamburger').onclick = ()=>{
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('main').classList.toggle('shifted');
+    };
+    document.getElementById('closeSidebar').onclick = ()=>{
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('main').classList.remove('shifted');
+    };
+    document.getElementById('clearFilter').onclick = ()=> location.reload();
+
+    document.querySelectorAll('#sidebarList li').forEach(li=>{
+      li.onclick = ()=>{
+        document.querySelectorAll('#sidebarList li').forEach(x=>x.classList.remove('highlight'));
+        li.classList.add('highlight');
+        selectedTeam = li.dataset.team;
+        renderGroups(); renderMatches();
+      };
+    });
+
+    document.getElementById('prevDay').onclick = ()=>{ if(currentDay>1) switchDay(--currentDay); };
+    document.getElementById('nextDay').onclick = ()=>{ if(currentDay<4) switchDay(++currentDay); };
+    spielDatum.onchange = ()=>{ chronosDates[currentDay] = spielDatum.value; };
+
+    function switchDay(n){
+      currentDay = n;
+      document.getElementById('aktDay').textContent = n;
+      spielDatum.value = chronosDates[n]||'';
+      renderMatches();
+    }
+
+    function renderGroups(){
+      document.querySelectorAll('.group-tables tbody tr').forEach(r=>{
+        r.style.background = (r.dataset.team===selectedTeam)?'orange':'';
+      });
+    }
+
+    function renderMatches(){
+      const nav = document.querySelector('.spieltag-nav');
+      if(selectedTeam){
+        nav.style.display = 'none';
+        document.querySelectorAll('.spieltag-info small').forEach(s=>s.style.display='block');
+        for(let d=1; d<=4; d++){
+          const blk = document.getElementById(`block${d}`);
+          let any=false;
+          blk.querySelectorAll('tbody tr').forEach(r=>{
+            const a=r.dataset.a, b=r.dataset.b;
+            const show=(a===selectedTeam||b===selectedTeam);
+            r.style.display = show?'':'none';
+            if(show) any=true;
+          });
+          blk.style.display = any?'block':'none';
+          if(any){
+            blk.querySelector('.date-show').textContent =
+              chronosDates[d]? new Date(chronosDates[d]).toLocaleDateString('de-DE') : '–';
+          }
+        }
+      } else {
+        nav.style.display = 'flex';
+        document.querySelectorAll('.spieltag-info small').forEach(s=>s.style.display='none');
+        for(let d=1; d<=4; d++){
+          document.getElementById(`block${d}`).style.display = (d===currentDay)?'block':'none';
+        }
+      }
+    }
+
+    pinBtn.onclick = ()=>{
+      if(document.getElementById('pin-input').value==='3141'){
+        adminOn = true;
+        enableEdit();
+        manualSaveBtn.removeAttribute('disabled');
+        document.getElementById('teamEditor').style.display = 'block';
+        alert('Admin-Modus aktiviert');
+      } else {
+        alert('Falscher PIN');
+      }
+      document.getElementById('pin-input').value = '';
+    };
+
+    manualSaveBtn.onclick = ()=>{
+      if(adminOn) saveOmega();
+      else alert('Bitte zuerst anmelden');
+    };
+
+    function enableEdit(){
+      spielDatum.disabled = false;
+      document.querySelectorAll('.result-input input').forEach(inp=>{
+        inp.disabled = false;
+        inp.onblur = ()=>{
+          document.querySelectorAll(`#block${currentDay} tbody tr`).forEach((r,i)=>{
+            const [i1,i2] = r.querySelectorAll('input');
+            nebulaMatchdays[currentDay][i].goalsA = i1.value;
+            nebulaMatchdays[currentDay][i].goalsB = i2.value;
+          });
+          updateGroupStats();
+        };
+      });
+      showEditor();
+    }
+
+    function showEditor(){
+      const editor = document.getElementById('teamEditor');
+      editor.innerHTML = '<h3>Teamnamen bearbeiten</h3>';
+      Object.keys(xenonTeams).forEach(code=>{
+        const row = document.createElement('div');
+        row.className = 'edit-row';
+        row.innerHTML =
+          `<label>${code}:</label>
+           <input id="edit-${code}" value="${xenonTeams[code]}">`;
+        editor.appendChild(row);
+        document.getElementById(`edit-${code}`).onchange = e=>{
+          xenonTeams[code] = e.target.value;
+          updateAllNames();
+        };
+      });
+    }
+
+    function updateAllNames(){
+      document.querySelectorAll('#sidebarList li').forEach(li=>{
+        li.textContent = xenonTeams[li.dataset.team];
+      });
+      document.querySelectorAll('.group-tables tbody tr').forEach(r=>{
+        r.children[0].textContent = xenonTeams[r.dataset.team];
+      });
+      document.querySelectorAll('.spieltag-block tbody tr').forEach(r=>{
+        r.children[2].textContent = xenonTeams[r.dataset.a];
+        r.children[3].textContent = xenonTeams[r.dataset.b];
+        r.children[5].textContent = xenonTeams[r.dataset.r];
+      });
+    }
+
+    function updateGroupStats(){
+      const stats = {};
+      document.querySelectorAll('#groupA tbody tr, #groupB tbody tr').forEach(r=>{
+        stats[r.dataset.team] = { games:0, wins:0, gf:0, ga:0 };
+      });
+      document.querySelectorAll('.spieltag-block').forEach(blk=>{
+        if(blk.style.display==='block'){
+          blk.querySelectorAll('tbody tr').forEach(r=>{
+            if(r.style.display!=='none'){
+              const a=r.dataset.a, b=r.dataset.b;
+              const [i1,i2] = r.querySelectorAll('input');
+              const g1=parseInt(i1.value,10), g2=parseInt(i2.value,10);
+              if(!isNaN(g1)&&!isNaN(g2)){
+                stats[a].games++; stats[a].gf+=g1; stats[a].ga+=g2; if(g1>g2) stats[a].wins++;
+                stats[b].games++; stats[b].gf+=g2; stats[b].ga+=g1; if(g2>g1) stats[b].wins++;
+              }
+            }
+          });
+        }
+      });
+      ['A','B'].forEach(pref=>{
+        const tbody = document.querySelector(`#group${pref} tbody`);
+        Object.keys(stats).filter(c=>c.startsWith(pref)).forEach(code=>{
+          const r = tbody.querySelector(`tr[data-team="${code}"]`);
+          const s = stats[code];
+          r.children[1].textContent = s.games;
+          r.children[2].textContent = s.wins;
+          r.children[3].textContent = `${s.gf}:${s.ga}`;
+        });
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort((r1,r2)=>{
+          const s1=stats[r1.dataset.team], s2=stats[r2.dataset.team];
+          if(s2.wins!==s1.wins) return s2.wins-s1.wins;
+          return (s2.gf-s2.ga)-(s1.gf-s1.ga);
+        });
+        rows.forEach(r=>tbody.appendChild(r));
+      });
+    }
+
+    // START
+    switchDay(1);
+    loadOmega();
+  </script>
+</body>
+</html>
